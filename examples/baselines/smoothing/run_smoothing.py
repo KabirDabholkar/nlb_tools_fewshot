@@ -1,7 +1,9 @@
 # ---- Imports ---- #
 from nlb_tools.nwb_interface import NWBDataset
+from nlb_tools.make_fewshot import extract_reallyheldout_by_id
 from nlb_tools.make_tensors import make_train_input_tensors, make_eval_input_tensors, make_eval_target_tensors, save_to_h5
 from nlb_tools.evaluation import evaluate
+from functools import partial
 import numpy as np
 import h5py
 import scipy.signal as signal
@@ -19,12 +21,18 @@ default_dict = { # [kern_sd, alpha]
 }
 
 # ---- Run Params ---- #
-dataset_name = "mc_rtt" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
+dataset_name = "mc_maze_small" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
                             # 'mc_maze_large', 'mc_maze_medium', 'mc_maze_small'}
-bin_size_ms = 5
+bin_size_ms = 20
+
+# function to extract neurons for fewshot analysis
+really_heldout_neurons_ids = np.arange(10,dtype=int)
+extract_reallyheldout_by_id_partial = partial(extract_reallyheldout_by_id,neuron_ids_to_extract=really_heldout_neurons_ids)
+
+
 kern_sd = default_dict[dataset_name][0]
 alpha = default_dict[dataset_name][1]
-phase = 'test' # one of {'test', 'val'}
+phase = 'val' # one of {'test', 'val'}
 log_offset = 1e-4 # amount to add before taking log to prevent log(0) error
 
 # ---- Useful variables ---- #
@@ -35,13 +43,13 @@ bpskey = pref_dict.get(dataset_name, '') + 'co-bps'
 
 # ---- Data locations ---- #
 datapath_dict = {
-    'mc_maze': '~/data/000128/sub-Jenkins/',
-    'mc_rtt': '~/data/000129/sub-Indy/',
-    'area2_bump': '~/data/000127/sub-Han/',
-    'dmfc_rsg': '~/data/000130/sub-Haydn/',
-    'mc_maze_large': '~/data/000138/sub-Jenkins/',
-    'mc_maze_medium': '~/data/000139/sub-Jenkins/',
-    'mc_maze_small': '~/data/000140/sub-Jenkins/',
+    'mc_maze': '~/datasets/000128/sub-Jenkins/',
+    'mc_rtt': '~/datasets/000129/sub-Indy/',
+    'area2_bump': '~/datasets/000127/sub-Han/',
+    'dmfc_rsg': '~/datasets/000130/sub-Haydn/',
+    'mc_maze_large': '~/datasets/000138/sub-Jenkins/',
+    'mc_maze_medium': '~/datasets/000139/sub-Jenkins/',
+    'mc_maze_small': '~/datasets/000140/sub-Jenkins/',
 }
 prefix_dict = {
     'mc_maze': '*full',
@@ -65,9 +73,11 @@ else:
     train_split = ['train', 'val']
     eval_split = 'test'
 train_dict = make_train_input_tensors(dataset, dataset_name, train_split, save_file=False)
+train_dict = extract_reallyheldout_by_id_partial(train_dict)
 train_spikes_heldin = train_dict['train_spikes_heldin']
 train_spikes_heldout = train_dict['train_spikes_heldout']
 eval_dict = make_eval_input_tensors(dataset, dataset_name, eval_split, save_file=False)
+eval_dict = extract_reallyheldout_by_id_partial(eval_dict)
 eval_spikes_heldin = eval_dict['eval_spikes_heldin']
 
 # ---- Useful shape info ---- #
@@ -140,7 +150,21 @@ output_dict = {
 }
 save_to_h5(output_dict, savepath, overwrite=True)
 
+
+print('train_dict')
+for k,v in train_dict.items():
+    print(k,v.shape)
+
+print('eval_dict')
+for k,v in eval_dict.items():
+    print(k,v.shape)
+
 # ---- Evaluate locally ---- #
 if phase == 'val':
     target_dict = make_eval_target_tensors(dataset, dataset_name, train_split, eval_split, save_file=False, include_psth=True)
+    for k,v in target_dict.items():
+        target_dict[k] = extract_reallyheldout_by_id_partial(v)
+    print('eval_target_dict')
+    for k,v in target_dict['mc_maze_small_20'].items():
+        print(k,type(v),v.shape if hasattr(v,'shape') else None)
     print(evaluate(target_dict, output_dict))
