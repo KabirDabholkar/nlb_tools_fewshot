@@ -146,7 +146,7 @@ fewshot_output_dict = {}
 # iterating over K values
 for k in fewshot_meta_data['Kvalues_applicable']:
      # iterating over fewshot subsets
-    for id in fewshot_meta_data[f'{k}shot_ids'][:1]:
+    for id in fewshot_meta_data[f'{k}shot_ids']:
         fewshot_train_spikes_heldin = train_dict[f'{k}shot_id{id}_'+'train_spikes_heldin']
         fewshot_train_spikes_heldout = train_dict[f'{k}shot_id{id}_'+'train_spikes_heldout']
         
