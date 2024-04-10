@@ -14,22 +14,27 @@ def fewshot_from_train(
     num_trials = num_trials_all[0]
     assert all([t == num_trials for t in num_trials_all])
     Kvalues = np.array(Kvalues)
-    Kvalues = Kvalues[Kvalues<num_trials]
+    Kvalues_applicable = Kvalues[Kvalues<num_trials]
 
     updates = {}
+    meta_data = {}
+    meta_data['Kvalues_applicable'] = Kvalues_applicable
     for key,val in train_dict.items():
-        for K in Kvalues:
+        for K in Kvalues_applicable:
             chunks = split_into_chunks_of_K(val, K)
-            updates[f'{K}shot_'+key] = chunks
+            meta_data[f'{K}shot_ids'] = list(range(len(chunks)))
+            for id,chunk in enumerate(chunks):
+                updates[f'{K}shot_id{id}_'+key] = chunk
+            
     train_dict = {
         **train_dict,
         **updates
     }
-    return train_dict
+    return train_dict,meta_data
 
 def split_into_chunks_of_K(train_array,K):
     max_len = (train_array.shape[0]//K) * K
-    return np.split(train_array[:max_len],np.arange(0, max_len, K),axis=0)
+    return np.split(train_array[:max_len],np.arange(K, max_len, K),axis=0)
 
 
 def extract_reallyheldout_by_id(data_dict,

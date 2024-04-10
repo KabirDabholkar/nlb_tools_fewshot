@@ -100,12 +100,19 @@ def evaluate(test_annotation_file, user_submission_file):
             eval_rates = np.concatenate(
                 [eval_rates_heldin, eval_rates_heldout], axis=-1
             )
-
             # calculate co-smoothing bits per spike
             result_dict["co-bps"] = float(
                 bits_per_spike(eval_rates_heldout, eval_spikes_heldout)
             )
 
+            # fewshot evaluatation
+            for key,value in user_submission_file[dataset_name].items():
+                if "eval_rates_heldout" in key and "shot" in key:
+                    eval_rates_heldout = value 
+                    score_name = '_'.join(key.split('_')[:2])+' co-bps'
+                    result_dict[score_name] = float(
+                        bits_per_spike(eval_rates_heldout, eval_spikes_heldout)
+                    )
             if dataset == "dmfc_rsg":
                 # Compute Pearson's r for the correlation between neural speed and tp
                 result_dict["tp corr"] = speed_tp_correlation(
@@ -178,6 +185,8 @@ def evaluate(test_annotation_file, user_submission_file):
                 result_dict["fp-bps"] = float(
                     bits_per_spike(eval_rates_forward, eval_spikes_forward)
                 )
+
+            
 
             if dataset in ["mc_maze_large", "mc_maze_medium", "mc_maze_small"]:
                 sd = scaling_dict if suf == "" else scaling_dict_20
