@@ -21,14 +21,14 @@ default_dict = { # [kern_sd, alpha]
 }
 
 # ---- Run Params ---- #
-dataset_name = "mc_maze_small" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
+dataset_name = "mc_maze" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
                             # 'mc_maze_large', 'mc_maze_medium', 'mc_maze_small'}
 bin_size_ms = 20
 
 # function to extract neurons for fewshot analysis
 really_heldout_neurons_ids = np.arange(10,dtype=int)
 extract_reallyheldout_by_id_partial = partial(extract_reallyheldout_by_id,neuron_ids_to_extract=really_heldout_neurons_ids)
-Kvalues = (2**np.arange(2,10)).astype(int)
+Kvalues = (2**np.arange(2,15)).astype(int)
 print(Kvalues)
 kern_sd = default_dict[dataset_name][0]
 alpha = default_dict[dataset_name][1]
@@ -198,10 +198,10 @@ if phase == 'val':
     target_dict = make_eval_target_tensors(dataset, dataset_name, train_split, eval_split, save_file=False, include_psth=True)
     for k,v in target_dict.items():
         target_dict[k] = extract_reallyheldout_by_id_partial(v)
-    print('eval_target_dict')
-    for k,v in target_dict['mc_maze_small_20'].items():
-        print(k,type(v),v.shape if hasattr(v,'shape') else None)
-    print('output_dict')
-    for k,v in output_dict['mc_maze_small_20'].items():
-        print(k,type(v),v.shape if hasattr(v,'shape') else None)
+    # print('eval_target_dict')
+    # for k,v in target_dict['mc_maze_small_20'].items():
+    #     print(k,type(v),v.shape if hasattr(v,'shape') else None)
+    # print('output_dict')
+    # for k,v in output_dict['mc_maze_small_20'].items():
+    #     print(k,type(v),v.shape if hasattr(v,'shape') else None)
     print(evaluate(target_dict, output_dict))

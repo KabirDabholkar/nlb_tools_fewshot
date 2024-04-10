@@ -6,9 +6,11 @@ import neo
 import quantities as pq
 from elephant.gpfa import GPFA
 from sklearn.linear_model import LinearRegression, PoissonRegressor, Ridge
+from functools import partial
 
 from nlb_tools.nwb_interface import NWBDataset
 from nlb_tools.make_tensors import make_train_input_tensors, make_eval_input_tensors, make_eval_target_tensors, save_to_h5
+from nlb_tools.make_fewshot import extract_reallyheldout_by_id, fewshot_from_train
 from nlb_tools.evaluation import evaluate
 
 # ---- Default params ---- #
@@ -23,14 +25,17 @@ default_dict = { # [latent_dim, alpha1, alpha2]
 }
 
 # ---- Run Params ---- #
-dataset_name = "area2_bump" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
+dataset_name = "mc_maze" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
                             # 'mc_maze_large', 'mc_maze_medium', 'mc_maze_small'}
-bin_size_ms = 5
+bin_size_ms = 20
+Kvalues = (2**np.arange(2,15)).astype(int)
+really_heldout_neurons_ids = np.arange(10,dtype=int)
+extract_reallyheldout_by_id_partial = partial(extract_reallyheldout_by_id,neuron_ids_to_extract=really_heldout_neurons_ids)
 # replace defaults with other values if desired
 latent_dim = default_dict[dataset_name][0]
 alpha1 = default_dict[dataset_name][1]
 alpha2 = default_dict[dataset_name][2]
-phase = 'test' # one of {'test', 'val'}
+phase = 'val' # one of {'test', 'val'}
 
 # ---- Useful variables ---- #
 binsuf = '' if bin_size_ms == 5 else f'_{bin_size_ms}'
@@ -40,13 +45,13 @@ bpskey = pref_dict.get(dataset_name, '') + 'co-bps'
 
 # ---- Data locations ---- #
 datapath_dict = {
-    'mc_maze': '~/data/000128/sub-Jenkins/',
-    'mc_rtt': '~/data/000129/sub-Indy/',
-    'area2_bump': '~/data/000127/sub-Han/',
-    'dmfc_rsg': '~/data/000130/sub-Haydn/',
-    'mc_maze_large': '~/data/000138/sub-Jenkins/',
-    'mc_maze_medium': '~/data/000139/sub-Jenkins/',
-    'mc_maze_small': '~/data/000140/sub-Jenkins/',
+    'mc_maze': '~/datasets/000128/sub-Jenkins/',
+    'mc_rtt': '~/datasets/000129/sub-Indy/',
+    'area2_bump': '~/datasets/000127/sub-Han/',
+    'dmfc_rsg': '~/datasets/000130/sub-Haydn/',
+    'mc_maze_large': '~/datasets/000138/sub-Jenkins/',
+    'mc_maze_medium': '~/datasets/000139/sub-Jenkins/',
+    'mc_maze_small': '~/datasets/000140/sub-Jenkins/',
 }
 prefix_dict = {
     'mc_maze': '*full',
@@ -56,7 +61,7 @@ prefix_dict = {
 }
 datapath = datapath_dict[dataset_name]
 prefix = prefix_dict.get(dataset_name, '')
-savepath = f'{dataset_name}{"" if bin_size_ms == 5 else f"_{bin_size_ms}"}_smoothing_output_{phase}.h5'
+savepath = f'{dataset_name}{"" if bin_size_ms == 5 else f"_{bin_size_ms}"}_gpfa_output_{phase}.h5'
 
 # ---- Load data ---- #
 dataset = NWBDataset(datapath, prefix, 
@@ -71,9 +76,12 @@ else:
     train_split = ['train', 'val']
     eval_split = 'test'
 train_dict = make_train_input_tensors(dataset, dataset_name, train_split, save_file=False)
+train_dict = extract_reallyheldout_by_id_partial(train_dict)
+train_dict, fewshot_meta_data = fewshot_from_train(train_dict,Kvalues=Kvalues)
 train_spikes_heldin = train_dict['train_spikes_heldin']
 train_spikes_heldout = train_dict['train_spikes_heldout']
 eval_dict = make_eval_input_tensors(dataset, dataset_name, eval_split, save_file=False)
+eval_dict = extract_reallyheldout_by_id_partial(eval_dict)
 eval_spikes_heldin = eval_dict['eval_spikes_heldin']
 
 # ---- Convert to neo.SpikeTrains ---- #
@@ -90,13 +98,18 @@ def array_to_spiketrains(array, bin_size):
             trialList.append(st)
         stList.append(trialList)
     return stList
+
+# fewshot_train_spikes_heldin = train_dict[f'{4}shot_id{0}_'+'train_spikes_heldin']
+# fewshot_train_st_heldin = array_to_spiketrains(fewshot_train_spikes_heldin, bin_size_ms)
 train_st_heldin = array_to_spiketrains(train_spikes_heldin, bin_size_ms)
 eval_st_heldin = array_to_spiketrains(eval_spikes_heldin, bin_size_ms)
 
 # ---- Run GPFA ---- #
-gpfa = GPFA(bin_size=(bin_size_ms * pq.ms), x_dim=latent_dim)
+gpfa = GPFA(bin_size=(bin_size_ms * pq.ms), x_dim=latent_dim) #, em_max_iters = 2)
 train_factors = gpfa.fit_transform(train_st_heldin)
+print('Evaluating GPFA model...')
 eval_factors = gpfa.transform(eval_st_heldin)
+# eval_factors_fewshot = gpfa.transform(fewshot_train_st_heldin)
 
 # ---- Reshape factors ---- #
 train_factors_s = np.vstack([train_factors[i].T for i in range(len(train_factors))])
@@ -150,10 +163,10 @@ def fit_rectlin(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=N
     true_min = np.min([np.min(train_rates_s), np.min(eval_rates_s)])
     train_rates_s[train_rates_s < thresh] = thresh
     eval_rates_s[eval_rates_s < thresh] = thresh
-    return train_rates_s, eval_rates_s
+    return train_rates_s, eval_rates_s, ridge
 
 # ---- Rate prediction ---- #
-train_rates_heldin_s, eval_rates_heldin_s = fit_rectlin(train_factors_s, eval_factors_s, train_spikes_heldin_s, eval_spikes_heldin_s, alpha=alpha1)
+train_rates_heldin_s, eval_rates_heldin_s, ridge = fit_rectlin(train_factors_s, eval_factors_s, train_spikes_heldin_s, eval_spikes_heldin_s, alpha=alpha1)
 train_rates_heldout_s, eval_rates_heldout_s = fit_poisson(train_rates_heldin_s, eval_rates_heldin_s, train_spikes_heldout_s, alpha=alpha2)
 
 train_rates_heldin = train_rates_heldin_s.reshape(num_train, tlength, hi_chan)
@@ -161,9 +174,46 @@ train_rates_heldout = train_rates_heldout_s.reshape(num_train, tlength, ho_chan)
 eval_rates_heldin = eval_rates_heldin_s.reshape(num_eval, tlength, hi_chan)
 eval_rates_heldout = eval_rates_heldout_s.reshape(num_eval, tlength, ho_chan)
 
+# ----- Few shot rate predicion ---- #
+# _, eval_rates_heldout_s = fit_poisson(train_rates_heldin_s, eval_rates_heldin_s, train_spikes_heldout_s, alpha=alpha2)
+fewshot_output_dict = {}
+# iterating over K values
+for k in fewshot_meta_data['Kvalues_applicable']:
+     # iterating over fewshot subsets
+    for id in fewshot_meta_data[f'{k}shot_ids']:
+        # print(f'{k}shot_id{id}_')
+        fewshot_train_spikes_heldin = train_dict[f'{k}shot_id{id}_'+'train_spikes_heldin']
+        fewshot_train_spikes_heldout = train_dict[f'{k}shot_id{id}_'+'train_spikes_heldout']
+        # eval_spikes_heldin = eval_dict['eval_spikes_heldin'] # same evaluation set as the standard evaluation
+        fewshot_train_spikes_heldout_s = fewshot_train_spikes_heldout.reshape(-1, fewshot_train_spikes_heldout.shape[2])
+        
+        fewshot_train_st_heldin = array_to_spiketrains(fewshot_train_spikes_heldin, bin_size_ms)
+        fewshot_train_st_heldout = array_to_spiketrains(fewshot_train_spikes_heldout, bin_size_ms)
+        # eval_st_heldout = array_to_spiketrains(eval_spikes_heldin, bin_size_ms)
+        
+        # print(fewshot_train_st_heldin.shape,fewshot_train_st_heldin.shape,eval_st_heldin.shape)
+        fewshot_train_factors = gpfa.transform(fewshot_train_st_heldin)
+        fewshot_train_factors_s = np.vstack([fewshot_train_factors[i].T for i in range(len(fewshot_train_factors))])
+        # eval_factors = gpfa.transform(fewshot_train_st_heldin)
+
+        fewshot_train_rates_s = ridge.predict(fewshot_train_factors_s)
+        thresh = 1e-10
+        fewshot_train_rates_s[fewshot_train_rates_s < thresh] = thresh
+                
+        (
+            fewshot_train_rates_s, eval_rates_s
+        ) = fit_poisson(
+            fewshot_train_rates_s, eval_rates_heldin_s, fewshot_train_spikes_heldout_s, alpha=alpha2
+        )
+        eval_rates_heldout_fewshot = eval_rates_s.reshape(num_eval, tlength, ho_chan)
+        # eval_rates_heldout_all.append(fewshot_eval_spksmth_heldout)
+        fewshot_output_dict [f'{k}shot_id{id}_eval_rates_heldout'] = np.array(eval_rates_heldout_fewshot)
+
+
 # ---- Save output ---- #
 output_dict = {
     dataset_name + binsuf: {
+        **fewshot_output_dict,
         'train_rates_heldin': train_rates_heldin,
         'train_rates_heldout': train_rates_heldout,
         'eval_rates_heldin': eval_rates_heldin,
@@ -174,4 +224,6 @@ save_to_h5(output_dict, savepath, overwrite=True)
 
 if phase == 'val':
     target_dict = make_eval_target_tensors(dataset, dataset_name, train_split, eval_split, save_file=False, include_psth=True)
+    for k,v in target_dict.items():
+        target_dict[k] = extract_reallyheldout_by_id_partial(v)
     print(evaluate(target_dict, output_dict))

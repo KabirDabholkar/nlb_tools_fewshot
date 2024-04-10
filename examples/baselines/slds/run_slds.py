@@ -22,9 +22,9 @@ default_dict = { # [states, factors, dynamics_kwargs]
 }
 
 # ---- Run Params ---- #
-dataset_name = "area2_bump" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
+dataset_name = "mc_maze_small" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
                             # 'mc_maze_large', 'mc_maze_medium', 'mc_maze_small'}
-bin_size_ms = 5
+bin_size_ms = 20
 # replace defaults with other values if desired
 # defaults are not optimal for 20 ms resolution
 states = default_dict[dataset_name][0]
@@ -42,13 +42,13 @@ bpskey = pref_dict.get(dataset_name, '') + 'co-bps'
 
 # ---- Data locations ---- #
 datapath_dict = {
-    'mc_maze': '~/data/000128/sub-Jenkins/',
-    'mc_rtt': '~/data/000129/sub-Indy/',
-    'area2_bump': '~/data/000127/sub-Han/',
-    'dmfc_rsg': '~/data/000130/sub-Haydn/',
-    'mc_maze_large': '~/data/000138/sub-Jenkins/',
-    'mc_maze_medium': '~/data/000139/sub-Jenkins/',
-    'mc_maze_small': '~/data/000140/sub-Jenkins/',
+    'mc_maze': '~/datasets/000128/sub-Jenkins/',
+    'mc_rtt': '~/datasets/000129/sub-Indy/',
+    'area2_bump': '~/datasets/000127/sub-Han/',
+    'dmfc_rsg': '~/datasets/000130/sub-Haydn/',
+    'mc_maze_large': '~/datasets/000138/sub-Jenkins/',
+    'mc_maze_medium': '~/datasets/000139/sub-Jenkins/',
+    'mc_maze_small': '~/datasets/000140/sub-Jenkins/',
 }
 prefix_dict = {
     'mc_maze': '*full',
