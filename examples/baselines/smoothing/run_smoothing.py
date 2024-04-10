@@ -1,6 +1,6 @@
 # ---- Imports ---- #
 from nlb_tools.nwb_interface import NWBDataset
-from nlb_tools.make_fewshot import extract_reallyheldout_by_id
+from nlb_tools.make_fewshot import extract_reallyheldout_by_id, fewshot_from_train
 from nlb_tools.make_tensors import make_train_input_tensors, make_eval_input_tensors, make_eval_target_tensors, save_to_h5
 from nlb_tools.evaluation import evaluate
 from functools import partial
@@ -28,8 +28,8 @@ bin_size_ms = 20
 # function to extract neurons for fewshot analysis
 really_heldout_neurons_ids = np.arange(10,dtype=int)
 extract_reallyheldout_by_id_partial = partial(extract_reallyheldout_by_id,neuron_ids_to_extract=really_heldout_neurons_ids)
-
-
+Kvalues = (2**np.arange(10)).astype(int)
+print(Kvalues)
 kern_sd = default_dict[dataset_name][0]
 alpha = default_dict[dataset_name][1]
 phase = 'val' # one of {'test', 'val'}
@@ -72,8 +72,9 @@ if phase == 'val':
 else:
     train_split = ['train', 'val']
     eval_split = 'test'
-train_dict = make_train_input_tensors(dataset, dataset_name, train_split, save_file=False)
+train_dict = make_train_input_tensors(dataset, dataset_name, train_split, save_file=False, include_forward_pred=True)
 train_dict = extract_reallyheldout_by_id_partial(train_dict)
+train_dict = fewshot_from_train(train_dict,Kvalues=Kvalues)
 train_spikes_heldin = train_dict['train_spikes_heldin']
 train_spikes_heldout = train_dict['train_spikes_heldout']
 eval_dict = make_eval_input_tensors(dataset, dataset_name, eval_split, save_file=False)
@@ -153,7 +154,7 @@ save_to_h5(output_dict, savepath, overwrite=True)
 
 print('train_dict')
 for k,v in train_dict.items():
-    print(k,v.shape)
+    print(k,v.shape if hasattr(v,'shape') else v)
 
 print('eval_dict')
 for k,v in eval_dict.items():

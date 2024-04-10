@@ -1,4 +1,3 @@
-from .chop import ChopInterface, chop_data, merge_chops
 from itertools import product
 import numpy as np
 import pandas as pd
@@ -7,6 +6,30 @@ import sys
 import os
 from typing import Optional,Iterable
 
+
+def fewshot_from_train(
+        train_dict: dict,
+        Kvalues : Iterable[int] = []):
+    num_trials_all = [t.shape[0] for t in train_dict.values()]
+    num_trials = num_trials_all[0]
+    assert all([t == num_trials for t in num_trials_all])
+    Kvalues = np.array(Kvalues)
+    Kvalues = Kvalues[Kvalues<num_trials]
+
+    updates = {}
+    for key,val in train_dict.items():
+        for K in Kvalues:
+            chunks = split_into_chunks_of_K(val, K)
+            updates[f'{K}shot_'+key] = chunks
+    train_dict = {
+        **train_dict,
+        **updates
+    }
+    return train_dict
+
+def split_into_chunks_of_K(train_array,K):
+    max_len = (train_array.shape[0]//K) * K
+    return np.split(train_array[:max_len],np.arange(0, max_len, K),axis=0)
 
 
 def extract_reallyheldout_by_id(data_dict,
@@ -135,3 +158,7 @@ def extract_reallyheldout(data_dict,
 
     return data_dict
 
+if __name__ == '__main__':
+    print(
+        split_into_chunks_of_K(np.arange(123),5)
+    )
