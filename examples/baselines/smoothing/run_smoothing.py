@@ -72,9 +72,18 @@ if phase == 'val':
 else:
     train_split = ['train', 'val']
     eval_split = 'test'
-train_dict = make_train_input_tensors(dataset, dataset_name, train_split, save_file=False, include_forward_pred=True)
-train_dict = extract_reallyheldout_by_id_partial(train_dict)
-train_dict, fewshot_meta_data = fewshot_from_train(train_dict,Kvalues=Kvalues)
+train_dict = make_train_input_tensors(
+    dataset, 
+    dataset_name, 
+    train_split, 
+    save_file=False, 
+    include_forward_pred=True, 
+    really_heldout_ids=really_heldout_neurons_ids,
+    fewshot_Kvalues=Kvalues
+)
+# train_dict = extract_reallyheldout_by_id_partial(train_dict)
+# train_dict, fewshot_meta_data = fewshot_from_train(train_dict,Kvalues=Kvalues)
+fewshot_meta_data = train_dict.pop('fewshot_meta_data')
 train_spikes_heldin = train_dict['train_spikes_heldin']
 train_spikes_heldout = train_dict['train_spikes_heldout']
 eval_dict = make_eval_input_tensors(dataset, dataset_name, eval_split, save_file=False)

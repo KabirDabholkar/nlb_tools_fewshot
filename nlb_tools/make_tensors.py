@@ -7,6 +7,8 @@ import pandas as pd
 import h5py
 import sys
 import os
+from nlb_tools.make_fewshot import extract_reallyheldout_by_id, fewshot_from_train
+from typing import Optional,Iterable
 import logging
 
 logger = logging.getLogger(__name__)
@@ -212,7 +214,9 @@ def make_train_input_tensors(dataset, dataset_name,
                              save_path="train_input.h5",
                              include_behavior=False,
                              include_forward_pred=False,
-                             seed=0):
+                             seed=0,
+                             really_heldout_ids: Optional[Iterable[int]] = None,
+                             fewshot_Kvalues: Optional[Iterable[int]] = None):
     """Makes model training input tensors.
     Creates 3d arrays containing heldin and heldout spikes
     for train trials (and other data if indicated)
@@ -342,6 +346,15 @@ def make_train_input_tensors(dataset, dataset_name,
     # Delete jitter column
     if jitter is not None:
         dataset.trial_info.drop(align_jit.name, axis=1, inplace=True)
+
+    # Extract neuron ids for really heldout
+    if really_heldout_ids is not None:
+        data_dict = extract_reallyheldout_by_id(data_dict,neuron_ids_to_extract=really_heldout_ids)
+
+    # Create few-shot splits
+    if fewshot_Kvalues is not None:
+        data_dict, fewshot_meta_data = fewshot_from_train(data_dict,Kvalues=fewshot_Kvalues)
+        data_dict['fewshot_meta_data'] = fewshot_meta_data
 
     # Save and return data
     if save_file:

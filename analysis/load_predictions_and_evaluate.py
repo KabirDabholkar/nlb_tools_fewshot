@@ -10,8 +10,8 @@ import pandas as pd
 
 
 output_paths = {
-    'mc_maze_20': ['mc_maze_20_gpfa_output_val.h5','mc_maze_20_smoothing_output_val.h5'],
-    'mc_maze_small_20': ['mc_maze_small_20_gpfa_output_val.h5','mc_maze_small_20_smoothing_output_val.h5']
+    'mc_maze_20' : ['mc_maze_20_gpfa_output_val.h5','mc_maze_20_smoothing_output_val.h5'],
+    'mc_maze_small_20' : ['mc_maze_small_20_gpfa_output_val.h5','mc_maze_small_20_smoothing_output_val.h5']
 }
 
 # ---- Run Params ---- #
@@ -95,18 +95,19 @@ for path in output_paths[dataset_key]:
 
     # Splitting column names based on space ' '
     columns_modified = columns
-    if any(['[' in c for c in columns]):
+    there_is_info_about_split = any(['[' in c for c in columns])
+    if there_is_info_about_split:
         columns_modified = [' '.join(col.split(' ')[1:]) for col in columns]
 
     # Creating a DataFrame
     df = pd.DataFrame([values], columns=columns_modified)
 
     # Adding the 'dataset' column
-    dataset_name = key_name + '_' + columns[0].split(' ')[0][1:-1]
+    dataset_name = key_name + ('_' + columns[0].split(' ')[0][1:-1] if there_is_info_about_split else '')
     df['dataset'] = dataset_name
     df['path'] = path
     eval_report.append(df)
 
-D = pd.concat(eval_report,axis=0)
+D = pd.concat(eval_report,axis=0).reset_index()
 D.to_csv('results.csv')
     
