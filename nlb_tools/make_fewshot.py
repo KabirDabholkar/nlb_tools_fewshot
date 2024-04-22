@@ -18,7 +18,7 @@ def fewshot_from_train(
 
     updates = {}
     meta_data = {}
-    meta_data['Kvalues_applicable'] = Kvalues_applicable
+    meta_data['Kvalues_applicable'] = [int(i) for i in list(Kvalues_applicable)]
     for key,val in train_dict.items():
         for K in Kvalues_applicable:
             chunks = split_into_chunks_of_K(val, K)

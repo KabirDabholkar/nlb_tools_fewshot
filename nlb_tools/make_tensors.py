@@ -5,6 +5,7 @@ from itertools import product
 import numpy as np
 import pandas as pd
 import h5py
+import json
 import sys
 import os
 from nlb_tools.make_fewshot import extract_reallyheldout_by_id, fewshot_from_train
@@ -352,13 +353,18 @@ def make_train_input_tensors(dataset, dataset_name,
         data_dict = extract_reallyheldout_by_id(data_dict,neuron_ids_to_extract=really_heldout_ids)
 
     # Create few-shot splits
+    fewshot_meta_data = None
     if fewshot_Kvalues is not None:
         data_dict, fewshot_meta_data = fewshot_from_train(data_dict,Kvalues=fewshot_Kvalues)
-        data_dict['fewshot_meta_data'] = fewshot_meta_data
+        # data_dict['fewshot_meta_data'] = fewshot_meta_data
 
     # Save and return data
     if save_file:
         save_to_h5(data_dict, save_path, overwrite=True)
+        if fewshot_meta_data is not None:
+            json_file_name =  '.'.join([save_path.split('.')[0],'json'])
+            with open(json_file_name,'w') as f:
+                json.dump(fewshot_meta_data,f)
     if return_dict:
         return data_dict
 

@@ -76,7 +76,7 @@ train_dict = make_train_input_tensors(
     dataset, 
     dataset_name, 
     train_split, 
-    save_file=False, 
+    save_file=True, 
     include_forward_pred=True, 
     really_heldout_ids=really_heldout_neurons_ids,
     fewshot_Kvalues=Kvalues
