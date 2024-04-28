@@ -7,6 +7,12 @@ __pycache__/
 *.h5
 *.csv
 
+# lightning
+lightning_logs/
+
+# plots
+plots/
+
 # C extensions
 *.so
 

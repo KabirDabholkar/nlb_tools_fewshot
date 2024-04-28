@@ -8,6 +8,7 @@ import numpy as np
 import h5py
 import scipy.signal as signal
 from sklearn.linear_model import PoissonRegressor
+from nlb_tools.torch_glm import fit_poisson as fit_poisson_pl
 
 # ---- Default params ---- #
 default_dict = { # [kern_sd, alpha]
@@ -72,18 +73,19 @@ if phase == 'val':
 else:
     train_split = ['train', 'val']
     eval_split = 'test'
-train_dict = make_train_input_tensors(
+train_dict,fewshot_meta_data = make_train_input_tensors(
     dataset, 
     dataset_name, 
     train_split, 
     save_file=True, 
+    return_meta_data=True,
     include_forward_pred=True, 
     really_heldout_ids=really_heldout_neurons_ids,
     fewshot_Kvalues=Kvalues
 )
 # train_dict = extract_reallyheldout_by_id_partial(train_dict)
 # train_dict, fewshot_meta_data = fewshot_from_train(train_dict,Kvalues=Kvalues)
-fewshot_meta_data = train_dict.pop('fewshot_meta_data')
+# fewshot_meta_data = train_dict.pop('fewshot_meta_data')
 train_spikes_heldin = train_dict['train_spikes_heldin']
 train_spikes_heldout = train_dict['train_spikes_heldout']
 eval_dict = make_eval_input_tensors(dataset, dataset_name, eval_split, save_file=False)
@@ -105,6 +107,8 @@ def full_spike_smoothing_method(train_spikes_heldin,train_spikes_heldout,eval_sp
         train_out = train_spikes_s if eval_spikes_s is None else np.vstack([train_spikes_s, eval_spikes_s])
         train_pred = []
         eval_pred = []
+        coefs = []
+        intercepts = []
         for chan in range(train_out.shape[1]):
             pr = PoissonRegressor(alpha=alpha, max_iter=500)
             pr.fit(train_in, train_out[:, chan])
@@ -114,11 +118,15 @@ def full_spike_smoothing_method(train_spikes_heldin,train_spikes_heldout,eval_sp
                 del pr
                 pr = PoissonRegressor(alpha=alpha, max_iter=oldmax * 5)
                 pr.fit(train_in, train_out[:, chan])
+            coefs.append(pr.coef_)
+            intercepts.append(pr.intercept_)
             train_pred.append(pr.predict(train_factors_s))
             eval_pred.append(pr.predict(eval_factors_s))
+        coefs = np.stack(coefs)
+        intercepts = np.stack(intercepts)
         train_rates_s = np.vstack(train_pred).T
         eval_rates_s = np.vstack(eval_pred).T
-        return np.clip(train_rates_s, 1e-9, 1e20), np.clip(eval_rates_s, 1e-9, 1e20)
+        return np.clip(train_rates_s, 1e-9, 1e20), np.clip(eval_rates_s, 1e-9, 1e20), coefs, intercepts
 
     # ---- Smooth spikes ---- #
     window = signal.gaussian(int(6 * kern_sd / bin_size_ms), int(kern_sd / bin_size_ms), sym=True)
@@ -141,7 +149,8 @@ def full_spike_smoothing_method(train_spikes_heldin,train_spikes_heldout,eval_sp
     eval_lograte_heldin_s = np.log(eval_spksmth_heldin_s + log_offset)
 
     # ---- Predict rates ---- #
-    train_spksmth_heldout_s, eval_spksmth_heldout_s = fit_poisson(train_lograte_heldin_s, eval_lograte_heldin_s, train_spikes_heldout_s, alpha=alpha)
+    train_spksmth_heldout_s, eval_spksmth_heldout_s, coefs, intercepts = fit_poisson(train_lograte_heldin_s, eval_lograte_heldin_s, train_spikes_heldout_s, alpha=alpha)
+    train_spksmth_heldout_s, eval_spksmth_heldout_s = fit_poisson_pl(train_lograte_heldin_s, eval_lograte_heldin_s, train_spikes_heldout_s, coefficients = coefs, intercepts = intercepts)
     train_spksmth_heldout = train_spksmth_heldout_s.reshape((-1, tlen, num_heldout))
     eval_spksmth_heldout = eval_spksmth_heldout_s.reshape((-1, tlen, num_heldout))
 
@@ -153,9 +162,9 @@ train_spksmth_heldin, train_spksmth_heldout, eval_spksmth_heldin, eval_spksmth_h
 
 fewshot_output_dict = {}
 # iterating over K values
-for k in fewshot_meta_data['Kvalues_applicable']:
+for k in [32]: #fewshot_meta_data['Kvalues_applicable']:
      # iterating over fewshot subsets
-    for id in fewshot_meta_data[f'{k}shot_ids']:
+    for id in fewshot_meta_data[f'{k}shot_ids'][:1]:
         fewshot_train_spikes_heldin = train_dict[f'{k}shot_id{id}_'+'train_spikes_heldin']
         fewshot_train_spikes_heldout = train_dict[f'{k}shot_id{id}_'+'train_spikes_heldout']
         

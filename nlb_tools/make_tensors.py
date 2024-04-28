@@ -212,6 +212,7 @@ def make_train_input_tensors(dataset, dataset_name,
                              update_params=None,
                              save_file=True,
                              return_dict=True,
+                             return_meta_data=False,
                              save_path="train_input.h5",
                              include_behavior=False,
                              include_forward_pred=False,
@@ -366,7 +367,10 @@ def make_train_input_tensors(dataset, dataset_name,
             with open(json_file_name,'w') as f:
                 json.dump(fewshot_meta_data,f)
     if return_dict:
-        return data_dict
+        if return_meta_data and fewshot_meta_data is not None:
+            return data_dict, fewshot_meta_data
+        else:
+            return data_dict
 
 def make_eval_input_tensors(dataset, dataset_name, 
                             trial_split='val',
