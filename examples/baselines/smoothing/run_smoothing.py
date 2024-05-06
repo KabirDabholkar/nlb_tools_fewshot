@@ -22,9 +22,9 @@ default_dict = { # [kern_sd, alpha]
 }
 
 # ---- Run Params ---- #
-dataset_name = "mc_maze" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
+dataset_name = "dmfc_rsg" # one of {'area2_bump', 'dmfc_rsg', 'mc_maze', 'mc_rtt', 
                             # 'mc_maze_large', 'mc_maze_medium', 'mc_maze_small'}
-bin_size_ms = 20
+bin_size_ms = 5
 
 # function to extract neurons for fewshot analysis
 really_heldout_neurons_ids = np.arange(10,dtype=int)

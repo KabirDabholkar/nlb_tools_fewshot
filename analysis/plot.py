@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import re
 import numpy as np
 
-D = pd.read_csv('/home/kabird/STNDT_fewshot/results3.csv',index_col=0)
+D = pd.read_csv('/home/kabird/STNDT_fewshot/results5.csv',index_col=0)
 
 D.drop(columns=['index'],inplace=True)
 print(D)
@@ -39,6 +39,7 @@ score_vars = [c for c in D.columns if 'co-bps' in c ] #+ ['vel R2','psth R2','fp
 # fig.savefig('plots/two_models.png')
 
 print(D.columns)
+D = D[D['co-bps']>0]
 Dbest = D[D['co-bps']>D['co-bps'].max()-2e-2]
 Dscores = Dbest[Dbest.path.isin(Dbest.path.unique()[:])][score_vars].T
 Dscores.columns = Dbest.path.unique()[:]
@@ -102,7 +103,7 @@ result_df = pd.DataFrame(result)
 print(result_df)
 D = pd.concat([D,result_df],axis=1)
 
-k = 16
+k = 1024
 
 fig,ax = plt.subplots()
 
@@ -155,6 +156,20 @@ ax.set_ylabel(f'mean{k}shot co-bps')
 sns.despine(fig,ax=ax)
 
 fig.savefig(f'plots/mean{k}shot_vs_co-bps.png',dpi=300)
+plt.close(fig)
+
+fig,ax = plt.subplots()
+x = D[f'mean{1024}shot co-bps']
+y = D[f'mean{16}shot co-bps']
+xerrors = D[f'std{1024}shot co-bps']
+yerrors = D[f'std{16}shot co-bps']
+ax.errorbar(x, y, yerr=yerrors, xerr=xerrors, fmt='.', markersize=7, color='black', capsize=2)
+# sns.scatterplot(x='co-bps',y='mean16shot co-bps',ax=ax,data=D)
+ax.set_xlabel(f'mean{1024}shot co-bps')
+ax.set_ylabel(f'mean{16}shot co-bps')
+sns.despine(fig,ax=ax)
+
+fig.savefig(f'plots/mean{16}shot_vs_mean{1024}shot.png',dpi=300)
 plt.close(fig)
 
 fig,ax = plt.subplots()
