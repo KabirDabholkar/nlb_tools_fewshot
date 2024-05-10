@@ -41,6 +41,22 @@ def plot_cross_decoding_scores(path_to_scores_numpy,path_to_savefig):
 
     plt.close(fig)
 
+
+def plot_cross_decoding_scores(path_to_scores_numpy,path_to_savefig):
+    saveloc = path_to_scores_numpy
+    scores = np.load(saveloc)
+    print(scores.shape)
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(1-scores)
+    ax.set_ylabel('input model')
+    ax.set_xlabel('target model')
+    fig.colorbar(im, ax=ax, label=r'$1-R^2$')
+    fig.tight_layout()
+    fig.savefig(path_to_savefig, dpi=300)
+
+    plt.close(fig)
+
 if __name__ == "__main__":
     plot_cross_decoding_scores(
         path_to_scores_numpy = '/home/kabird/STNDT_fewshot/ray_results/mc_maze_20_lite_all4_cross_decoding_scores.npy',
