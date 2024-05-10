@@ -153,7 +153,7 @@ def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=N
     input_dim = train_in.shape[1]
     output_dim = train_out.shape[1]
     # model = PoissonGLM(input_dim,output_dim)
-    model = LinearLightning(input_dim,output_dim,lr=1e-3)
+    model = LinearLightning(input_dim,output_dim,lr=1e-2)
 
     # Define early stopping callback
     early_stop_callback = pl.callbacks.EarlyStopping(
@@ -212,8 +212,8 @@ def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=N
     train_data, val_data = torch.utils.data.random_split(train_dataset, [num_train, len(train_dataset) - num_train])
 
     # Create DataLoaders
-    train_loader = DataLoader(train_data, batch_size=30, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=30)
+    train_loader = DataLoader(train_data, batch_size=40, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=40)
 
     # Initialize PoissonGLM model
     input_dim = train_in.shape[1]
@@ -223,9 +223,9 @@ def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=N
 
     # Set coefficients and intercepts if provided
     if coefficients is not None:
-        model.model.weight.data = torch.tensor(coefficients, dtype=torch.float32,device='cpu')
+        model.model.weight.data = torch.tensor(coefficients, dtype=torch.float32)
     if intercepts is not None:
-        model.model.bias.data = torch.tensor(intercepts, dtype=torch.float32,device='cpu')
+        model.model.bias.data = torch.tensor(intercepts, dtype=torch.float32)
 
     # If coefficients and intercepts are not provided, fit the model
     if train:
@@ -239,7 +239,7 @@ def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=N
         )
 
         # Train the model
-        trainer = pl.Trainer(max_epochs=250, callbacks=[early_stop_callback])
+        trainer = pl.Trainer(max_epochs=250, callbacks=[early_stop_callback], accelerator='cpu')
         trainer.fit(model, train_loader, val_loader)
 
     # Generate predictions
@@ -247,6 +247,8 @@ def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=N
         train_pred = model(train_in_tensor).detach().numpy()
         eval_pred = model(torch.tensor(eval_factors_s, dtype=torch.float32)).detach().numpy()
 
+    del(model)
+    del(train_dataset,train_in_tensor,train_out_tensor)
     train_rates_s = np.clip(np.exp(train_pred), 1e-9, 1e20)
     eval_rates_s = np.clip(np.exp(eval_pred), 1e-9, 1e20)
     return train_rates_s, eval_rates_s

@@ -23,7 +23,7 @@ from nlb_tools.make_fewshot import extract_reallyheldout_by_id, fewshot_from_tra
 from nlb_tools.fewshot_utils import result_dict_to_pandas
 from nlb_tools.make_tensors import make_train_input_tensors, make_eval_input_tensors, make_eval_target_tensors, save_to_h5, h5_to_dict
 from nlb_tools.evaluation import evaluate
-from nlb_tools.torch_glm import fit_poisson_sklearn as fit_poisson_parallel
+from nlb_tools.torch_glm import fit_poisson as fit_poisson_pl
 from functools import partial
 import numpy as np
 import h5py
@@ -81,20 +81,7 @@ def run_model_on_numpy_dummy(
     factors = np.zeros((trials, *spikes_full_shape[1:]))
     return rate_pred,factors
 
-def run_nlb_evaluation_protocol(
-    model: Any,
-    run_model_on_numpy_pre: Callable,
-    variant='mc_maze_small',
-    do_fewshot: bool = False,
-    do_evaluation: bool = True,
-    ):
-    """
-    Evaluation protocol:
-    Load data dicts.
-    Run model on validation set.
-    Run model on fewshot trials, get latents, train fewshot head.
-    """
-
+def load_nlb_data(variant='mc_maze_small'):
     target_path = osp.join(DATA_DIR, f"{variant}_target.h5")
 
     with h5py.File(target_path, 'r') as h5file:
@@ -112,6 +99,24 @@ def run_nlb_evaluation_protocol(
     train_path_json = osp.join(DATA_DIR, f"{variant}_train.json")
     with open(train_path_json, 'r') as file:
         few_shot_metadata = json.load(file)
+    
+    return  train_dict,val_dict,target_dict,few_shot_metadata
+
+def run_nlb_evaluation_protocol(
+    model: Any,
+    run_model_on_numpy_pre: Callable,
+    variant='mc_maze_small',
+    do_fewshot: bool = False,
+    do_evaluation: bool = True,
+    ):
+    """
+    Evaluation protocol:
+    Load data dicts.
+    Run model on validation set.
+    Run model on fewshot trials, get latents, train fewshot head.
+    """
+
+    train_dict,val_dict,target_dict,few_shot_metadata = load_nlb_data(variant=variant)
 
     
     # print(few_shot_metadata)
@@ -169,20 +174,20 @@ def run_nlb_evaluation_protocol(
     fewshot_output_dict = {}
     fewshot_latents_dict = {}
     if do_fewshot:
-        k_range = few_shot_metadata["Kvalues_applicable"] #2**np.arange(4,11)[:1].astype(int)
+        k_range = few_shot_metadata["Kvalues_applicable"][-2:-1] #2**np.arange(4,11)[:1].astype(int)
         # k_range = [int(k) for k in k_range]
         for k in k_range[:]:
-            for shot_id in few_shot_metadata[f'{k}shot_ids']:
+            for shot_id in few_shot_metadata[f'{k}shot_ids'][:]:
                 fewshot_train_spikes_heldin = train_dict[f'{k}shot_id{shot_id}_train_spikes_heldin']
                 fewshot_train_spikes_heldout = train_dict[f'{k}shot_id{shot_id}_train_spikes_heldout']
                 fewshot_train_spikes_heldout_s = fewshot_train_spikes_heldout.reshape(-1,fewshot_train_spikes_heldout.shape[-1])
                 
                 fewshot_train_pred, fewshot_train_latents = run_model_on_numpy(model,fewshot_train_spikes_heldin)
                 fewshot_train_latents = fewshot_train_latents[:,:fewshot_train_spikes_heldin.shape[1]]
-                fewshot_train_latents_s = fewshot_train_latents.reshape(-1,fewshot_train_latents.shape[-1])
-                fewshot_train_rates_s, eval_rates_s = fit_poisson_parallel(fewshot_train_latents_s,eval_latents_s,fewshot_train_spikes_heldout_s)
-                eval_rates = eval_rates_s.reshape(*heldout_spikes.shape[:2],-1)
-                fewshot_output_dict [f'{k}shot_id{shot_id}_eval_rates_heldout'] = eval_rates
+                # fewshot_train_latents_s = fewshot_train_latents.reshape(-1,fewshot_train_latents.shape[-1])
+                # fewshot_train_rates_s, eval_rates_s = fit_poisson_pl(fewshot_train_latents_s,eval_latents_s,fewshot_train_spikes_heldout_s)
+                # eval_rates = eval_rates_s.reshape(*heldout_spikes.shape[:2],-1)
+                # fewshot_output_dict [f'{k}shot_id{shot_id}_eval_rates_heldout'] = eval_rates
                 fewshot_latents_dict[f'{k}shot_id{shot_id}_train_latents'] = fewshot_train_latents
 
     output_dict[variant] = {
@@ -212,7 +217,63 @@ def run_nlb_evaluation_protocol(
     
     # D = result_data.reset_index()
     # D.to_csv()
-    return result_data_df, result_data_dict, latents_dict
+    return result_data_df, result_data_dict, latents_dict, output_dict
+
+def run_fewshot_given_latents(
+        latents_dict,
+        result_save_path='',
+        variant='mc_maze_small',
+        do_evaluation=True,
+        output_dict: dict = {},
+        fit_poisson_func: Callable = fit_poisson_pl):
+    train_dict,val_dict,target_dict,few_shot_metadata = load_nlb_data(variant=variant)
+                                                         
+    eval_latents = latents_dict[variant]['eval_latents']
+    eval_latents_s = eval_latents.reshape(-1,eval_latents.shape[-1])
+    heldout_spikes = val_dict['eval_spikes_heldout']
+
+    fewshot_output_dict = {}
+
+    k_range = few_shot_metadata["Kvalues_applicable"] #2**np.arange(4,11)[:1].astype(int)
+    # k_range = [int(k) for k in k_range]
+    for k in k_range[:]:
+        for shot_id in few_shot_metadata[f'{k}shot_ids']:
+            # fewshot_train_spikes_heldin = train_dict[f'{k}shot_id{shot_id}_train_spikes_heldin']
+            fewshot_train_spikes_heldout = train_dict[f'{k}shot_id{shot_id}_train_spikes_heldout']
+            fewshot_train_spikes_heldout_s = fewshot_train_spikes_heldout.reshape(-1,fewshot_train_spikes_heldout.shape[-1])
+            
+            if f'{k}shot_id{shot_id}_train_latents' in latents_dict[variant]:
+                fewshot_train_latents = latents_dict[variant][f'{k}shot_id{shot_id}_train_latents']
+                fewshot_train_latents_s = fewshot_train_latents.reshape(-1,fewshot_train_latents.shape[-1])
+                
+                fewshot_train_rates_s, eval_rates_s = fit_poisson_func(fewshot_train_latents_s,eval_latents_s,fewshot_train_spikes_heldout_s)
+                eval_rates = eval_rates_s.reshape(*heldout_spikes.shape[:2],-1)
+                fewshot_output_dict [f'{k}shot_id{shot_id}_eval_rates_heldout'] = eval_rates
+
+    if variant not in output_dict.keys():
+        output_dict[variant] = {}
+    output_dict[variant].update({**fewshot_output_dict})
+    
+    # fewshot_code_name = 'sklearn'
+    result_data_dict = None
+    result_data_df = None
+    if do_evaluation:
+        # print(output_dict)
+        result_data_dict = evaluate(target_dict, output_dict)
+        print('result_dict',result_data_dict)
+        result_data_df = result_dict_to_pandas(
+            result_data_dict,
+            # fewshot_learner=fewshot_code_name,
+            path=result_save_path
+        )
+
+    # eval_report.append(df)
+    
+    # D = result_data.reset_index()
+    # D.to_csv()
+    return result_data_df, result_data_dict
+
+    
 
 if __name__=="__main__":
     run_nlb_evaluation_protocol(

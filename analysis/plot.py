@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 import re
 import numpy as np
 
-D = pd.read_csv('/home/kabird/STNDT_fewshot/results5.csv',index_col=0)
+# D = pd.read_csv('/home/kabird/STNDT_fewshot/results5.csv',index_col=0)
+D = pd.read_csv('/home/kabird/STNDT_fewshot/ray_results/mc_maze_20_lite.csv',index_col=0)
 
-D.drop(columns=['index'],inplace=True)
+
+# D.drop(columns=['index'],inplace=True)
 print(D)
 # D['path'] = D['path'].str.split('/').str[3].str.split('_CHECK').str[0]
 print(len(D['path'].unique()))

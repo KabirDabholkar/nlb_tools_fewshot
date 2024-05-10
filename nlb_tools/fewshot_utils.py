@@ -1,6 +1,8 @@
 import pandas as pd
 
 def result_dict_to_pandas(result_data,**kwargs):
+    if len(result_data)==0:
+        return pd.DataFrame([]) 
     key_name = list(result_data[0].keys())[0]
 
     # Extracting the keys (column names) and the values (data) from the dictionary
