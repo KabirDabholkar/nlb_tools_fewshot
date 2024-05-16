@@ -23,7 +23,8 @@ from nlb_tools.make_fewshot import extract_reallyheldout_by_id, fewshot_from_tra
 from nlb_tools.fewshot_utils import result_dict_to_pandas
 from nlb_tools.make_tensors import make_train_input_tensors, make_eval_input_tensors, make_eval_target_tensors, save_to_h5, h5_to_dict
 from nlb_tools.evaluation import evaluate
-from nlb_tools.torch_glm import fit_poisson as fit_poisson_pl
+# from nlb_tools.torch_glm import fit_poisson as fit_poisson_pl
+from nlb_tools.sklearn_glm import fit_poisson
 from functools import partial
 import numpy as np
 import h5py
@@ -45,7 +46,7 @@ latents_save_path = 'all_model_latents.h5'
 threshold = 2e-3
 test_train_split = 0.7
 
-def get_full_shape(variant='mc_maze_small',target_dict=None,val_dict=None):
+def get_full_spikes(variant='mc_maze_small',target_dict=None,val_dict=None):
     if target_dict is None:
         target_path = osp.join(DATA_DIR, f"{variant}_target.h5")
         with h5py.File(target_path, 'r') as h5file:
@@ -125,13 +126,15 @@ def run_nlb_evaluation_protocol(
     # model()
     batch_size = 8
 
-    eval_spikes_full_shape = get_full_shape(variant=variant,target_dict=target_dict,val_dict=val_dict).shape
+    # eval_spikes_full_shape = get_full_shape(variant=variant,target_dict=target_dict,val_dict=val_dict).shape
 
 
     eval_spikes_heldin = val_dict['eval_spikes_heldin']
     eval_spikes_heldout = val_dict['eval_spikes_heldout']
     train_spikes_heldin = train_dict['train_spikes_heldin']
-    run_model_on_numpy = partial(run_model_on_numpy_pre,spikes_full_shape=eval_spikes_full_shape)
+    
+    # run_model_on_numpy = partial(run_model_on_numpy_pre,spikes_full_shape=eval_spikes_full_shape)
+    run_model_on_numpy = run_model_on_numpy_pre
     
     eval_pred, eval_latents = run_model_on_numpy(model,eval_spikes_heldin)
     train_pred, _ = run_model_on_numpy(model,train_spikes_heldin)
@@ -174,7 +177,9 @@ def run_nlb_evaluation_protocol(
     fewshot_output_dict = {}
     fewshot_latents_dict = {}
     if do_fewshot:
-        k_range = few_shot_metadata["Kvalues_applicable"][-2:-1] #2**np.arange(4,11)[:1].astype(int)
+        # k_range = few_shot_metadata["Kvalues_applicable"] #2**np.arange(4,11)[:1].astype(int)
+        k_range = [few_shot_metadata["Kvalues_applicable"][i] for i in [4,-1]]#[3,4,-1]] #2**np.arange(4,11)[:1].astype(int)
+
         # k_range = [int(k) for k in k_range]
         for k in k_range[:]:
             for shot_id in few_shot_metadata[f'{k}shot_ids'][:]:
@@ -225,12 +230,13 @@ def run_fewshot_given_latents(
         variant='mc_maze_small',
         do_evaluation=True,
         output_dict: dict = {},
-        fit_poisson_func: Callable = fit_poisson_pl):
+        fit_poisson_func: Callable = fit_poisson):
     train_dict,val_dict,target_dict,few_shot_metadata = load_nlb_data(variant=variant)
                                                          
     eval_latents = latents_dict[variant]['eval_latents']
     eval_latents_s = eval_latents.reshape(-1,eval_latents.shape[-1])
     heldout_spikes = val_dict['eval_spikes_heldout']
+    
 
     fewshot_output_dict = {}
 
@@ -259,6 +265,23 @@ def run_fewshot_given_latents(
     result_data_df = None
     if do_evaluation:
         # print(output_dict)
+
+        # import matplotlib.pyplot as plt
+        # heldin_spikes = val_dict['eval_spikes_heldin']
+        # heldout_spikes_val = val_dict['eval_spikes_heldout']
+        # # heldin = val_dict[variant]['eval_spikes_heldin']
+        # rates_heldout = output_dict[variant]['eval_rates_heldout']
+        # heldout = target_dict[variant]['eval_spikes_heldout']
+        # fig,axs= plt.subplots(1,3)
+        # ax = axs[0]
+        # ax.imshow(heldin_spikes[0][:,:,22:])
+        # ax = axs[1]
+        # ax.imshow(rates_heldout[0])
+        # ax = axs[2]
+        # ax.imshow(heldout_spikes_val[0])
+        # fig.savefig('/home/kabird/lfads-torch-fewshot-benchmark/plots/test_nlb_fewshot_heldout.png')
+        # print('load and save latents trials:',rates_heldout.shape[0])
+
         result_data_dict = evaluate(target_dict, output_dict)
         print('result_dict',result_data_dict)
         result_data_df = result_dict_to_pandas(
@@ -272,8 +295,6 @@ def run_fewshot_given_latents(
     # D = result_data.reset_index()
     # D.to_csv()
     return result_data_df, result_data_dict
-
-    
 
 if __name__=="__main__":
     run_nlb_evaluation_protocol(

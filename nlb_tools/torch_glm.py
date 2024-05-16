@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
-import lightning as pl
+# import lightning as pl
 import lightning.pytorch as pl
 from nlb_tools.metrics import bits_per_spike, poisson_nll_loss
 from sklearn.linear_model import PoissonRegressor
@@ -49,7 +49,8 @@ class LinearLightning(pl.LightningModule):
     def _general_step(self, batch, batch_idx):
         latents,target_spike_counts = batch
         pred_logrates = self(latents)
-        return -bits_per_spike(pred_logrates,target_spike_counts)
+        return poisson_nll_loss(pred_logrates,target_spike_counts)
+        # return -bits_per_spike(pred_logrates,target_spike_counts)
 
     def training_step(self, batch, batch_idx):
         loss = self._general_step(batch, batch_idx)
@@ -127,58 +128,58 @@ def fit_poisson_sklearn(train_factors_s, eval_factors_s, train_spikes_s, eval_sp
     return np.clip(train_rates_s, 1e-9, 1e20), np.clip(eval_rates_s, 1e-9, 1e20), coefs, intercepts
 
 
-def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=None, alpha=0.0, validation_split=0.2):
-    """
-    Fit Poisson GLM from factors to spikes and return rate predictions
-    """
+# def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=None, alpha=0.0, validation_split=0.2):
+#     """
+#     Fit Poisson GLM from factors to spikes and return rate predictions
+#     """
     
-    # Concatenate train and eval factors and spikes
-    train_in = train_factors_s if eval_spikes_s is None else np.vstack([train_factors_s, eval_factors_s])
-    train_out = train_spikes_s if eval_spikes_s is None else np.vstack([train_spikes_s, eval_spikes_s])
+#     # Concatenate train and eval factors and spikes
+#     train_in = train_factors_s if eval_spikes_s is None else np.vstack([train_factors_s, eval_factors_s])
+#     train_out = train_spikes_s if eval_spikes_s is None else np.vstack([train_spikes_s, eval_spikes_s])
 
-    # Convert numpy arrays to PyTorch tensors
-    train_in_tensor = torch.tensor(train_in, dtype=torch.float32)
-    train_out_tensor = torch.tensor(train_out, dtype=torch.float32)
+#     # Convert numpy arrays to PyTorch tensors
+#     train_in_tensor = torch.tensor(train_in, dtype=torch.float32)
+#     train_out_tensor = torch.tensor(train_out, dtype=torch.float32)
 
-    # Split train and eval datasets
-    train_dataset = TensorDataset(train_in_tensor, train_out_tensor)
-    num_train = int((1 - validation_split) * len(train_dataset))
-    train_data, val_data = torch.utils.data.random_split(train_dataset, [num_train, len(train_dataset) - num_train])
+#     # Split train and eval datasets
+#     train_dataset = TensorDataset(train_in_tensor, train_out_tensor)
+#     num_train = int((1 - validation_split) * len(train_dataset))
+#     train_data, val_data = torch.utils.data.random_split(train_dataset, [num_train, len(train_dataset) - num_train])
 
-    # Create DataLoaders
-    train_loader = DataLoader(train_data, batch_size=30, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=30)
+#     # Create DataLoaders
+#     train_loader = DataLoader(train_data, batch_size=100, shuffle=True)
+#     val_loader = DataLoader(val_data, batch_size=100)
 
-    # Initialize PoissonGLM model
-    input_dim = train_in.shape[1]
-    output_dim = train_out.shape[1]
-    # model = PoissonGLM(input_dim,output_dim)
-    model = LinearLightning(input_dim,output_dim,lr=1e-2)
+#     # Initialize PoissonGLM model
+#     input_dim = train_in.shape[1]
+#     output_dim = train_out.shape[1]
+#     # model = PoissonGLM(input_dim,output_dim)
+#     model = LinearLightning(input_dim,output_dim)
 
-    # Define early stopping callback
-    early_stop_callback = pl.callbacks.EarlyStopping(
-        monitor='val_loss',
-        min_delta=0.0,
-        patience=15,
-        verbose=True,
-        mode='min'
-    )
+#     # Define early stopping callback
+#     early_stop_callback = pl.callbacks.EarlyStopping(
+#         monitor='val_loss',
+#         min_delta=0.001,
+#         patience=15,
+#         verbose=False,
+#         mode='min'
+#     )
 
-    # Train the model
-    trainer = pl.Trainer(max_epochs=150, callbacks=[early_stop_callback], accelerator='cpu')
-    trainer.fit(model, train_loader, val_loader)
+#     # Train the model
+#     trainer = pl.Trainer(max_epochs=150, callbacks=[early_stop_callback]) #, accelerator='cpu')
+#     trainer.fit(model, train_loader, val_loader)
 
-    # Generate predictions
-    with torch.no_grad():
-        train_pred = model(train_in_tensor).detach().numpy()
-        eval_pred = model(torch.tensor(eval_factors_s, dtype=torch.float32)).detach().numpy()
+#     # Generate predictions
+#     with torch.no_grad():
+#         train_pred = model(train_in_tensor).detach().numpy()
+#         eval_pred = model(torch.tensor(eval_factors_s, dtype=torch.float32)).detach().numpy()
 
-    train_rates_s = np.clip(np.exp(train_pred), 1e-9, 1e20)
-    eval_rates_s = np.clip(np.exp(eval_pred), 1e-9, 1e20)
-    # print(train_rates_s.shape,eval_rates_s.shape)
-    # print('fraction of nans in input',np.isnan(train_factors_s).mean(),np.isnan(eval_factors_s).mean())
-    # print('fraction of nans:',np.mean(np.isnan(eval_rates_s)))
-    return train_rates_s, eval_rates_s
+#     train_rates_s = np.clip(np.exp(train_pred), 1e-9, 1e20)
+#     eval_rates_s = np.clip(np.exp(eval_pred), 1e-9, 1e20)
+#     # print(train_rates_s.shape,eval_rates_s.shape)
+#     # print('fraction of nans in input',np.isnan(train_factors_s).mean(),np.isnan(eval_factors_s).mean())
+#     # print('fraction of nans:',np.mean(np.isnan(eval_rates_s)))
+#     return train_rates_s, eval_rates_s
 
 def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=None, alpha=0.0, validation_split=0.2, coefficients=None, intercepts=None, train=True):
     """
@@ -212,14 +213,14 @@ def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=N
     train_data, val_data = torch.utils.data.random_split(train_dataset, [num_train, len(train_dataset) - num_train])
 
     # Create DataLoaders
-    train_loader = DataLoader(train_data, batch_size=40, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=40)
+    train_loader = DataLoader(train_data, batch_size=num_train, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=num_train)
 
     # Initialize PoissonGLM model
-    input_dim = train_in.shape[1]
-    output_dim = train_out.shape[1]
+    input_dim = train_in.shape[-1]
+    output_dim = train_out.shape[-1]
     # model = PoissonGLM(input_dim, output_dim)
-    model = LinearLightning(input_dim, output_dim)
+    model = LinearLightning(input_dim, output_dim, weight_decay=alpha)
 
     # Set coefficients and intercepts if provided
     if coefficients is not None:
@@ -231,15 +232,15 @@ def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=N
     if train:
         # Define early stopping callback
         early_stop_callback = pl.callbacks.EarlyStopping(
-            monitor='val_loss',
-            min_delta=0.001,
-            patience=30,
+            monitor='val_loss_epoch',
+            min_delta=0,
+            patience=15,
             verbose=True,
             mode='min'
         )
 
         # Train the model
-        trainer = pl.Trainer(max_epochs=250, callbacks=[early_stop_callback], accelerator='cpu')
+        trainer = pl.Trainer(max_epochs=150, callbacks=[early_stop_callback], log_every_n_steps=5)
         trainer.fit(model, train_loader, val_loader)
 
     # Generate predictions
@@ -255,7 +256,7 @@ def fit_poisson(train_factors_s, eval_factors_s, train_spikes_s, eval_spikes_s=N
 
 def main():
     # Generate dummy data
-    train_factors_s = np.random.randn(100, 5)
+    train_factors_s = np.random.randn(20, 5)
     proj = np.random.randn(5, 10) * 3e-1
     train_spikes_s = np.random.poisson(np.exp(np.dot(train_factors_s, proj)))
     eval_factors_s = np.random.randn(20, 5)
