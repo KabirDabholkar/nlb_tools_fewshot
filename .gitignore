@@ -16,7 +16,7 @@ lightning_logs/
 !plots/
 
 # Specifically include CSV files in the plots/ directory
-plots/*.csv
+!plots/*.csv
 
 # C extensions
 *.so
