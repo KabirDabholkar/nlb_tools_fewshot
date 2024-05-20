@@ -28,11 +28,19 @@ result_files = [
     #     'method' : 'lfads-torch',
     #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_dmfc_rsg/240501_030533_MultiFewshot/concatenated_results.csv', # LFADS dmfc_rsg
     # }
+    # {
+    #     'method' : 'lfads-torch-rates-pred',
+    #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240518_134433_MultiFewshot/concatenated_with_kshot_and_path_to_latents.csv', # LFADS mc_maze_20 22 really heldout
+    # },
+    # {
+    #     'method' : 'lfads-torch',
+    #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240514_000059_MultiFewshot/concatenated_results.csv', # LFADS mc_maze_20 22 really heldout
+    # },
     {
-        'method' : 'lfads-torch',
-        'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240514_000059_MultiFewshot/concatenated_results.csv', # LFADS mc_maze_20 22 really heldout
+        'method'  : 'STNDT',
+        'path' : '/home/kabird/STNDT_fewshot/ray_results/mc_maze_20_lite_all9and10.csv', # STNDT mc_maze
+        'co-bps threshold'  : 1e-2,
     },
-    
 ]
 
 
@@ -186,12 +194,12 @@ def check_extremes(best_results_with_latents):
 if __name__ == "__main__":
     # for [0]['path'].replace('.csv','_with_means.csv')
     # D = load_result_files(result_files)
-    D = pd.read_csv(result_files[0]['path'].replace('.csv','_with_means.csv'))
+    D = pd.read_csv(result_files[0]['path'])#.replace('.csv','_with_means.csv'))
 
     # print(D['co-bps'])
 
     # print(D.shape)
-    D = select_best_cobps(D,margin=0.7e-2)
+    D = select_best_cobps(D,margin=1e-2)
     
     # latents = load_latents(D,test_only_one=False,process=extract_latent)
     # # latent = latents[0]
@@ -199,13 +207,25 @@ if __name__ == "__main__":
     # D['latents'] = latents
     # D.dropna(subset=['latents'],inplace=True)
 
-
+    
     
     # results = pd.read_csv(
     #     '/home/kabird/STNDT_fewshot/ray_results/mc_maze_20_lite_all4.csv'
     # )
     
 
+    # plot_cross_decoding_scores_from_dataframe(
+    #     score_dataframe = pd.read_csv("/home/kabird/nlb_tools_fewshot/plots/LFADS_mc_maze_20_cross_decoding_matrix.csv"),
+    #     figsavepath = f'plots/cross_decoding_test.png' 
+    # )
+
+    # D_test = pd.read_csv("/home/kabird/nlb_tools_fewshot/plots/LFADS_mc_maze_20_cross_decoding_matrix.csv",index_col=0)
+    # D_test.index = D_test.index.astype(int)
+    # D_test.columns = D_test.columns.astype(int)
+    # print(
+    #     D_test.loc[141,69],
+    #     D_test.loc[69,141]
+    # )
 
     plot_cross_decoding_scores(
         path_to_scores_numpy = result_files[0]['path'].replace('.csv','_cross_decoding_scores.npy'),
@@ -213,47 +233,73 @@ if __name__ == "__main__":
     )
 
     scores = pd.read_csv(result_files[0]['path'].replace('.csv','_cross_decoding_scores.csv'))
-    scores_old = pd.read_csv(os.path.join(os.path.dirname(result_files[0]['path']), 'cross_decoding_scores_old.csv'),index_col=0)
-    print(scores_old.columns)
-    scores_old['from_id'] = scores_old['from_id'].str.split('_').str[3].astype(int)
-    scores_old['to_id'] = scores_old['to_id'].str.split('_').str[3].astype(int)
-    scores_old.drop(columns=['from_to_index','from','to'],inplace=True)
+    # scores_old = pd.read_csv(os.path.join(os.path.dirname(result_files[0]['path']), 'cross_decoding_scores_old.csv'),index_col=0)
+    # print(scores_old.columns)
+    # scores_old['from_id'] = scores_old['from_id'].str.split('_').str[3].astype(int)
+    # scores_old['to_id'] = scores_old['to_id'].str.split('_').str[3].astype(int)
+    # scores_old.drop(columns=['from_to_index','from','to'],inplace=True)
     
 
-    # print('shapes',D.shape,len(D['path'].unique()))
-    D.index = D['path'].str.split('/').str[7].str.split('_').str[3].astype(int)
-    scores['from_id'] = scores['from_id'].str.split('/').str[7].str.split('_').str[3].astype(int)
-    scores['to_id'] = scores['to_id'].str.split('/').str[7].str.split('_').str[3].astype(int)
-    scores.drop(columns=['from_to_index','from','to'],inplace=True)
+    ##################
+
+    # scores = pd.read_csv("/home/kabird/nlb_tools_fewshot/plots/LFADS_mc_maze_20_cross_decoding_matrix.csv",index_col=0)
+    # scores.index = scores.index.astype(int)
+    # scores.columns = scores.columns.astype(int)
+    # column_sum = 1-np.mean(scores.values,axis=1)
     
-    scores_old_and_new = pd.merge(scores, scores_old, on=['from_id', 'to_id'],suffixes=('_new','_old'))
+    
+    # results = pd.read_csv('/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240514_000059_MultiFewshot/concatenated_results_with_means.csv',index_col=0)
+    # results['model_id'] = results['path'].str.split('/').str[7].str.split('_').str[3].astype(int)
+    # results.index = results['model_id']
+    # print([c for c in results.columns if 'mean' in c])
+    # index_to_plot = scores.columns
+    # print(scores.columns.shape,
+    # results.shape,
+    # column_sum.shape)
+    # plt.scatter(results.loc[index_to_plot,'mean32shot co-bps:sklearn_glm.fit_poisson_parallel(alpha=0.001,max_iter=500)'],column_sum)
+    # plt.savefig('plots/test_scores.png')
+    
+    
+    ###################################
+
+    # # print('shapes',D.shape,len(D['path'].unique()))
+    # D.index = D['path'].str.split('/').str[7].str.split('_').str[3].astype(int)
+    # scores['from_id'] = scores['from_id'].str.split('/').str[7].str.split('_').str[3].astype(int)
+    # scores['to_id'] = scores['to_id'].str.split('/').str[7].str.split('_').str[3].astype(int)
+    # scores.drop(columns=['from_to_index','from','to'],inplace=True)
+    
+    # scores_old_and_new = pd.merge(scores, scores_old, on=['from_id', 'to_id'],suffixes=('_new','_old'))
     
 
-    print(scores.shape)
-    print(scores_old.shape)
+    # print(scores.shape)
+    # print(scores_old.shape)
 
-    print('scores_old_and_new',scores_old_and_new.columns)
+    # print('scores_old_and_new',scores_old_and_new.columns)
 
-    fig,ax = plt.subplots()
-    # ax.scatter(scores_old_and_new['score_old'],scores_old_and_new['score_new'])
-    sns.scatterplot(x='score_old',y='score_new',data=scores_old_and_new,ax=ax,s=10)
-    ax.plot([0.75,1],[0.75,1],ls='dashed',c='black')
+    # fig,ax = plt.subplots()
+    # # ax.scatter(scores_old_and_new['score_old'],scores_old_and_new['score_new'])
+    # sns.scatterplot(x='score_old',y='score_new',data=scores_old_and_new,ax=ax,s=10)
+    # ax.plot([0.75,1],[0.75,1],ls='dashed',c='black')
     
-    ax.set_title(f'corrcoef{np.corrcoef(scores_old_and_new["score_old"],scores_old_and_new["score_new"])[0,1]}')
-    fig.savefig('plots/cross_decoding_scores_old_and_new.png')
+    # ax.set_title(f'corrcoef{np.corrcoef(scores_old_and_new["score_old"],scores_old_and_new["score_new"])[0,1]}')
+    # fig.savefig('plots/cross_decoding_scores_old_and_new.png')
 
-    # print(D.index)
-    # print(scores['from_id'])
+    # # print(D.index)
+    # # print(scores['from_id'])
 
-    best_results = D
-    best_results = compute_colsums(
-        best_results,
-        scores
-    )
+    # best_results = D
+    # best_results = compute_colsums(
+    #     best_results,
+    #     scores
+    # )
 
-    # check_extremes(best_results)
-    # print(best_results)
-    best_results.dropna(subset=['mean64shot co-bps:torch_glm.fit_poisson'],inplace=True)
+    # # check_extremes(best_results)
+    # # print(best_results)
+    # best_results.dropna(subset=['mean64shot co-bps:torch_glm.fit_poisson'],inplace=True)
+
+
+    ########################
+
 
     # fig,axs = plt.subplots(1,4,figsize=(15,4))
     # ax = axs[0]

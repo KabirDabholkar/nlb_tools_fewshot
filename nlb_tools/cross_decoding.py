@@ -22,6 +22,7 @@ from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from pathlib import Path
 
+
 from typing import Callable, Optional
 
 from nlb_tools.make_tensors import h5_to_dict
@@ -54,9 +55,18 @@ result_files = [
     #     'method' : 'lfads-torch',
     #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_dmfc_rsg/240501_030533_MultiFewshot/concatenated_results.csv', # LFADS dmfc_rsg
     # }
+    # {
+    #     'method' : 'lfads-torch',
+    #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240514_000059_MultiFewshot/concatenated_results.csv', # LFADS mc_maze_20 22 really heldout
+    # },
+    # {
+    #     'method' : 'lfads-torch-rates-pred',
+    #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240518_134433_MultiFewshot/concatenated_with_kshot_and_path_to_latents.csv', # LFADS mc_maze_20 22 really heldout
+    # },
     {
-        'method' : 'lfads-torch',
-        'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240514_000059_MultiFewshot/concatenated_results.csv', # LFADS mc_maze_20 22 really heldout
+        'method'  : 'STNDT',
+        'path' : '/home/kabird/STNDT_fewshot/ray_results/mc_maze_20_lite_all9and10.csv', # STNDT mc_maze
+        'co-bps threshold'  : 1e-2,
     },
     
 ]
@@ -85,11 +95,13 @@ def select_best_cobps(D,use='co-bps',margin = 2e-2):
 
 def load_latents(D,process = None,test_only_one=False):
     latents = []
-    for i,row in D.iterrows():
+    for i,row in tqdm(list(D.iterrows())):
         result_path = row['path']
-        latent_path = result_path.split('results_all')[0] + 'latents.h5'
-        latent_path = result_path.split('results_new')[0] + 'latents.h5'
+        # latent_path = result_path.split('results_all')[0] + 'latents.h5'
+        # latent_path = result_path.split('results_new')[0] + 'latents.h5'
+        latent_path = 'results'.join(result_path.split('results')[:-1]) + 'latents.h5'
         # path_exists = os.path.exists(latent_path)
+        print(latent_path)
         try:
             with h5py.File(latent_path, 'r') as h5file:
                 latent = h5_to_dict(h5file)
@@ -205,7 +217,7 @@ def cross_decoding(
     # np.save(saveloc, scores)
     return score_dataframe, scores, trained_models, test_datasets
 
-def compute_colsums(best_results,score_dataframe):
+def compute_colsums(best_results,score_dataframe,axis = 0):
     
     # additionally condition on good heldin co_bps
     # latents_dataframe = latents_dataframe[latents_dataframe[f'debugging/val_{1000}shot_co_bps_recon_truereadout']>0.36]
@@ -232,7 +244,10 @@ def compute_colsums(best_results,score_dataframe):
     # print(square_score_dataframe)
     square_score_dataframe = square_score_dataframe.loc[selection,:].loc[:,selection]
     square_dist_dataframe = 1 - np.array(square_score_dataframe.values)
-    col_sums = square_dist_dataframe.mean(axis=0)
+    col_sums = square_dist_dataframe.mean(axis=axis)
+    print('inside compute_colsums')
+    print(square_score_dataframe.iloc[:4,:4])
+    print(best_results.iloc[:4,:4])
     best_results['1-R^2 column sum'] = col_sums
     return best_results
 
@@ -240,19 +255,44 @@ def compute_colsums(best_results,score_dataframe):
 if __name__=="__main__":
 
     D = load_result_files(result_files)
-    print(D['co-bps'])
+    # unique_exp = D['path'].str.split('/').str[6].unique()
 
-    print(D.shape)
-    D = select_best_cobps(D,use='valid/co_bps',margin=1e-2) #2e-2
+    print('Num models before filtering co-bps',len(D))
+    D = select_best_cobps(D,use='co-bps',margin=result_files[0]['co-bps threshold']) #2e-2
+
+    # D = pd.concat([
+    #     D[D['path'].str.split('/').str[6] == unique_exp[0]].tail(3),
+    #     D[D['path'].str.split('/').str[6] == unique_exp[1]].tail(3)
+    # ],axis=0)
+
+    print('Num models after filtering co-bps',len(D))
+    # raise Exception('stop')
     
     latents = load_latents(D,test_only_one=False,process=extract_latent)
-    # latent = latents[0]
-    # print(latent.shape)
     D['latents'] = latents
     D.dropna(subset=['latents'],inplace=True)
+
+
+    # D['latents'] = D.apply(lambda x: x['latents'][...,-45:] if x['path'].str.split('/').str[6] == unique_exp[1] else x)
+    # condition = D['path'].str.split('/').str[6] == unique_exp[1]
+    # D.loc[condition, 'latents'] = D.loc[condition, 'latents'].apply(lambda x: x[...,-45:])
     
     # D = D.head(3)
-    print(D.shape)
+    # D = D.tail(3)
+    # print(D['latents'].apply(lambda x: x.shape))
+    # print(D['latents'].apply(lambda x: x.shape).unique())
+
+    # fig,axs = plt.subplots(1,2)
+    # ax = axs[0]
+    # # lat1 = D[D['path'].str.split('/').str[6] == unique_exp[0]]['latents'].head(1).values
+    # lat2 = D[D['path'].str.split('/').str[6] == unique_exp[1]]['latents'].head(1).values[0]
+    # # ax.hist(lat1.flatten())
+    # ax = axs[1]
+    # lat2 = np.array(lat2,dtype='float')
+    # lat2 = np.maximum(lat2,1e-10)
+    # ax.hist(np.log(lat2).flatten())
+    # ax.set_yscale('log')
+    # fig.savefig('plots/latent_histograms.png',dpi=200)
     
     # # from sklearn.decomposition import PCA
     # for id,lat in enumerate(D['latents']):
@@ -286,7 +326,7 @@ if __name__=="__main__":
     #         ax.plot(pred_proj[i,:,0],pred_proj[i,:,1],ls='dashed',c=f'C{i}')
     #     fig.savefig(f'/home/kabird/nlb_tools_fewshot/plots/PCA_nlb{id}.png',dpi=300)
 
-    
+    ################################
 
     D['train_latents'],D['test_latents'] = zip(*D['latents'].apply(partial(train_test_split,random_state=0)))
     D['model_id'] = D['path']
@@ -298,6 +338,9 @@ if __name__=="__main__":
         regression_model=LinearRegression,
         metric=partial(r2_score,multioutput='uniform_average'),
     )
+
+    ###################################
+
     # lat0 = D['train_latents'].iloc[0]
     # lat1 = D['train_latents'].iloc[1]
     # reg_model = LinearRegression()
@@ -325,8 +368,12 @@ if __name__=="__main__":
     #                                         r2_score,'predict'))
     # print('trained model score',score_model(trained_models[1],test_datasets[1],r2_score,'predict'))
 
+
+    ##################
+
     result_path = result_files[0]['path']
     pathdir = result_path.split('.csv')[0]
+    print('pathdir',pathdir)
     csv_path = pathdir + '_cross_decoding_scores.csv'
     scores_dataframe.to_csv(csv_path)
 
@@ -334,6 +381,8 @@ if __name__=="__main__":
     np.save(numpy_path, scores)
 
 
+
+    #################
     
     
     

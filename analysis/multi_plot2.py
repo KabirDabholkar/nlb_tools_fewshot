@@ -27,13 +27,22 @@ result_files = [
     # }
     # {
     #     'method' : 'lfads-torch',
-    #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240514_000059_MultiFewshot/concatenated_results.csv', # LFADS mc_maze_20 22 really heldout
+    #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240514_000059_MultiFewshot/concatenated_results.csv', # LFADS mc_maze_20 22 really heldout MAIN
+    # },
+    # {
+    #     'method' : 'lfads-torch-rates-pred',
+    #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240518_134433_MultiFewshot/concatenated_with_kshot_and_path_to_latents.csv', # LFADS mc_maze_20 22 really heldout
+    # },
+    # {
+    #     'method' : 'lfads-torch',
+    #     'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240519_184438_MultiFewshot/concatenated_results.csv', # LFADS mc_maze_20 22 really heldout
     # },
     {
-        'method' : 'lfads-torch-rates-pred',
-        'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240518_134433_MultiFewshot/concatenated_with_kshot_and_path_to_latents.csv', # LFADS mc_maze_20 22 really heldout
+        'method' : 'lfads-torch',
+        'path' : '/home/kabird/lfads-torch-runs/lfads-torch-fewshot-benchmark/nlb_mc_maze/240519_194718_MultiFewshot/concatenated_results.csv', # LFADS mc_maze_20 22 really heldout
     },
 ]
+
 
 D = []
 for f in result_files:
@@ -43,43 +52,13 @@ for f in result_files:
     D.append(d_)
 
 D = pd.concat(D,axis=0)
-print(D.columns)
+D.drop(columns=['index'],inplace=True)
+# D.dropna(subset=['path'],inplace=True)
+# print(D['path'].str.split('/').str[7].unique())
+D.index = D['path'].str.split('/').str[7].str.split('_').str[3].astype(int)
+# print(D.columns)
 # print(D.groupby('method').head(2))
 
-
-# ##### Load and concat old dataframe
-
-# # D_old = pd.read_csv(result_files[0]['path'].replace('concatenated_results.csv','concat_model_data.csv'))
-# D_old = pd.read_csv(result_files[0]['path'].replace('concatenated_results.csv','concatenated_results_new.csv'))
-
-# D['model_id_digit'] = D['path'].str.split('/').str[7].str.split('_').str[3]
-# D_old['model_id_digit'] = D_old['path'].str.split('_').str[3]
-# # print(D_old.sort_values(by=['model_id'])['model_id'])
-# print(D.sort_values(by='model_id_digit')['model_id_digit'])
-# print(D_old.sort_values(by='model_id_digit')['model_id_digit'])
-# D = pd.concat([D.sort_values(by='model_id_digit').reset_index(),D_old.sort_values(by='model_id_digit').reset_index()],axis=1)
-# D = D.loc[:, ~D.columns.duplicated()]
-
-
-
-# D_old = pd.read_csv(result_files[0]['path'].replace('concatenated_results.csv','concat_model_data.csv'))
-
-# # D['model_id_digit'] = D['path'].str.split('/').str[7].str.split('_').str[3]
-# # D_old['model_id_digit'] = D_old['path'].str.split('_').str[3]
-# D_old['model_id_digit'] = D_old['model_id']
-# print(D_old.sort_values(by=['model_id'])['model_id'])
-# print(D.sort_values(by='model_id_digit')['model_id_digit'])
-# print(D_old.sort_values(by='model_id_digit')['model_id_digit'])
-# D = pd.concat([D,D_old.sort_values(by='model_id_digit').reset_index()],axis=1)
-# D = D.loc[:, ~D.columns.duplicated()]
-
-# print('old valid/ results',[c for c in D.columns if 'valid' in c])
-
-
-# #############
-
-
-# print('old valid/ results',[c for c in D.columns if 'valid' in c])
 
 
 # ############
@@ -91,25 +70,43 @@ scores['to_id'] = scores['to_id'].str.split('/').str[7].str.split('_').str[3].as
 scores.drop(columns=['from_to_index','from','to'],inplace=True)
 
 # # scores_old_and_new = pd.merge(scores, scores_old, on=['from_id', 'to_id'],suffixes=('_new','_old'))
-D = compute_colsums(
-    D,#[D['co-bps']>D['co-bps'].max()-1e-2],
-    scores
-)
-D.rename(columns={'1-R^2 column sum': '1-R2 column sum new'}, inplace=True)
-D = compute_colsums(
-    D,#[D['co-bps']>D['co-bps'].max()-1e-2],
-    scores,
-    axis=1
-)
-D.rename(columns={'1-R^2 column sum': '1-R2 row sum new'}, inplace=True)
 
-# # D = compute_colsums(
-# #     D[D['co-bps']>D['co-bps'].max()-1e-2],
-# #     scores_old
-# # )
-# # D.rename(columns={'1-R^2 column sum': '1-R2 column sum old'}, inplace=True)
 
-# #############
+# print(scores.shape)
+
+square_score_dataframe = scores.pivot(
+    index = 'from_id',
+    columns = 'to_id',
+    values = 'score'
+)
+
+# print(square_score_dataframe.index,len(square_score_dataframe.index))
+
+idx_intersection = square_score_dataframe.index.intersection(D.index)
+print('idx_intersection',idx_intersection)
+D = D.loc[idx_intersection]
+# D['1-R2 column sum new'] = (1-square_score_dataframe.values).mean(axis=0)
+# D['1-R2 row sum new'] = (1-square_score_dataframe.values).mean(axis=1)
+D['1-R2 column sum new'] = (1-square_score_dataframe.loc[:,idx_intersection].values).mean(axis=0)
+D['1-R2 row sum new'] = (1-square_score_dataframe.loc[idx_intersection,:].values).mean(axis=1)
+
+
+print(D.iloc[:4,:4])
+
+# D = compute_colsums(
+#     D,#[D['co-bps']>D['co-bps'].max()-1e-2],
+#     scores
+# )
+# D.rename(columns={'1-R^2 column sum': '1-R2 column sum new'}, inplace=True)
+# D = compute_colsums(
+#     D,#[D['co-bps']>D['co-bps'].max()-1e-2],
+#     scores,
+#     axis=1
+# )
+# D.rename(columns={'1-R^2 column sum': '1-R2 row sum new'}, inplace=True)
+
+
+# # #############
 
 
 score_vars = [c for c in D.columns if 'co-bps' in c ] + ['vel R2','psth R2','fp-bps'] #and 'shot' in c
@@ -130,17 +127,7 @@ for column in df.columns:
         # ks.add(int(match.group(1)))
 
 print('k values',ks)
-# Calculate mean and std for each K
-# result = {}
-# for k in ks:
-#     pattern_k = re.compile(f'{k}shot_id(\d+) co-bps')
-#     columns = [column for column in df.columns if pattern_k.match(column)]
-#     subset = df[columns]
-#     mean_column_name = f'mean{k}shot co-bps'
-#     std_column_name = f'std{k}shot co-bps'
-#     result[mean_column_name] = subset.mean(axis=1)
-#     result[std_column_name] = subset.std(axis=1)/np.sqrt(len(columns))
-# Calculate mean and std for each K
+
 
 # method_name1 = 'torch_glm.fit_poisson'
 # method_name2 = 'sklearn_glm.fit_poisson_parallel'
@@ -153,21 +140,16 @@ method_name3 = 'sklearn_glm.fit_poisson_parallel(alpha=0.001,max_iter=500)'
 result = {}
 for k in ks:
     k_val, method_name = k
-    # print(k_val,method_name)
-    # print(df.columns)
-    # print(f'{k_val}shot_id\d+ co-bps:{method_name}')
-    # print(re.match(f'{k_val}shot_id\d+ co-bps:', '512shot_id0 co-bps:sklearn_glm.fit_poisson_parallel(alpha=0.0,max_iter=500)'))
-    # print(re.match(f'{k_val}shot_id\d+ co-bps:', '512shot_id0 co-bps:sklearn_glm.fit_poisson_parallel(alpha=0.0,max_iter=1000)'))
-    # print(re.match(f'{k_val}shot_id\d+ co-bps:'+re.escape(mea), '512shot_id0 co-bps:sklearn_glm.fit_poisson_parallel(alpha=0.0,max_iter=1000)'))
-    # print(re.match(f'{k_val}shot_id\d+ co-bps:'+re.escape(method_name), '512shot_id0 co-bps:'))
+
     columns = [column for column in df.columns if re.match(f'{k_val}shot_id\d+ co-bps:'+re.escape(method_name), column)]
-    print('columns',columns)
+    # print('columns',columns)
     subset = df[columns]
-    print('subset',subset)
+    # print('subset',subset)
     mean_column_name = f'mean{k_val}shot co-bps:{method_name}'
     std_column_name = f'std{k_val}shot co-bps:{method_name}'
     result[mean_column_name] = subset.mean(axis=1)
     result[std_column_name] = subset.std(axis=1)
+    print(std_column_name)
 
 # concat statististics
 result_df = pd.DataFrame(result)
@@ -186,16 +168,13 @@ D.columns  =  [c.replace('co_bps','co-bps') for c in  D.columns]
 # print(D.dataset.unique())
 
 D = D[D['co-bps']>0]
-# D.dropna(subset=[f'mean{32}shot co-bps:{method_name}'],inplace=True)
-# D = D[D[f'mean{32}shot co-bps:sklearn_glm.fit_poisson_parallel']>-1]
-# Dbest = D[D['co-bps']>D['co-bps'].max()-2e-2]
-# print('max',D[f'mean{32}shot co-bps:{method_name}'].max())
-# print('any nans',np.isnan(D[f'mean{32}shot co-bps:{method_name}'].values).any())
+
 print(D.dataset.unique())
 Dscores = D #Dbest[Dbest.path.isin(Dbest.path.unique()[:])]#.T
-# Dscores.columns = Dbest.path.unique()[:]
+
 
 D.columns = [c.replace(':','\n') for c in D.columns]
+
 
 def prepare_dataframe_for_plotting(df):
     """
@@ -219,13 +198,16 @@ def prepare_dataframe_for_plotting(df):
     
     return df_long
 
-to_plot = ([f'mean{k}shot co-bps\n{method_name1}' for k in [32,64,1024]]
-            + [f'mean{k}shot co-bps\n{method_name2}' for k in [32,64,1024]] 
-            + [f'mean{k}shot co-bps\n{method_name3}' for k in [32,64,1024]] 
+to_plot = ([]# [f'mean{k}shot co-bps\n{method_name1}' for k in [32,64,1024]]
+            # + [f'mean{k}shot co-bps\n{method_name2}' for k in [32,64,1024]] 
+            # + [f'mean{k}shot co-bps\n{method_name3}' for k in [32,64,1024]] 
             # + [f'mean{k}shot co-bps\n{method_name4}' for k in [64,1024]] 
             # +[f'valid/{k}shot_lfads_torch.post_run.fewshot_analysis.LinearLightning_recon_bps'for k in [100,1000]]
             # +[f'valid/{k}shot_lfads_torch.post_run.fewshot_analysis.LinearLightning_reallyheldout_bps' for k in [100,1000]]
             # +['1-R2 column sum old']
+            + [f'mean{k}shot co-bps\n{method_name1}' for k in [128,256,1024]]
+            + [f'mean{k}shot co-bps\n{method_name2}' for k in [128,256,1024]]
+            + [f'mean{k}shot co-bps\n{method_name3}' for k in [128,256,1024]]
             + ['1-R2 column sum new']
             + ['1-R2 row sum new']
            + ['co-bps'] 
@@ -238,9 +220,10 @@ print('Method unique:',Dscores['method'].unique())
 dataset_name = Dscores.dataset.unique()[0] #'mc_maze_20_split'
 print(Dscores.dataset.unique())
 for dataset_name in Dscores.dataset.unique()[:1]:
-    select_Dscores = Dscores[Dscores.dataset==dataset_name][to_plot]
+    select_Dscores = Dscores[Dscores.dataset==dataset_name]
+    
     # select_Dscores = select_Dscores[select_Dscores[f'mean{1024}shot co-bps\n{method_name3}'] > select_Dscores[f'mean{1024}shot co-bps\n{method_name3}'].max()-1e-2]
-    select_Dscores = select_Dscores[select_Dscores['co-bps']>select_Dscores['co-bps'].max()-1e-2]
+    select_Dscores = select_Dscores[select_Dscores['co-bps']>select_Dscores['co-bps'].max()-0.5e-2]
     # print('median co-bps index',select_Dscores['co-bps'].sort_values(ascending=False).head(0).index)
     print('max co-bps index',select_Dscores['co-bps'].sort_values(ascending=False).head(1).index)
     # select_Dscores = prepare_dataframe_for_plotting(select_Dscores)
@@ -250,7 +233,7 @@ for dataset_name in Dscores.dataset.unique()[:1]:
 
     ### cross correlation matrix
     # Calculate the correlation matrix
-    df = select_Dscores
+    df = select_Dscores[to_plot]
     corr_matrix = df.corr()
 
     # Plot the heatmap
@@ -264,7 +247,8 @@ for dataset_name in Dscores.dataset.unique()[:1]:
 
     print('saved correlations plot')
 
-    # kshot_title = f'mean{32}shot co-bps\n{method_name3}'
+    kshot_title = f'mean{256}shot co-bps\n{method_name3}'
+    kshot_title_stderr = kshot_title.replace('mean','std')
 
     # ###### cross decoding
     # best_k_shot_idx = select_Dscores.sort_values(
@@ -277,17 +261,54 @@ for dataset_name in Dscores.dataset.unique()[:1]:
     # print('worst',worst_k_shot_idx)
     # print('best',best_k_shot_idx)
 
-    # # Create a scatter plot
-    # data = select_Dscores
-    # fig,ax=plt.subplots()
     
+
+    # # Create a scatter plot
+    data = select_Dscores
+
+    fig,axs = plt.subplots(2,2,figsize=(12,10))
+
+    for j,score_title in enumerate([kshot_title,'co-bps']):
+        ax = axs[0,j]
+        sns.scatterplot(data=data, x='1-R2 column sum new', y=score_title,ax=ax)
+        if score_title==kshot_title:
+            ax.errorbar(data['1-R2 column sum new'],data[score_title],yerr=data[kshot_title_stderr],fmt='o')
+        ax.set_title
+
+        # Annotate each point with its DataFrame index
+        for i in data.index:
+            ax.text(data.loc[i]['1-R2 column sum new'], data.loc[i][score_title], str(i), color='red', ha='right')
+
+        ax = axs[1,j]
+        sns.scatterplot(data=data, x='1-R2 row sum new', y=score_title,ax=ax)
+        if score_title==kshot_title:
+            ax.errorbar(data['1-R2 row sum new'],data[kshot_title],yerr=data[kshot_title_stderr],fmt='o')
+
+        # Annotate each point with its DataFrame index
+        for i in data.index:
+            ax.text(data.loc[i]['1-R2 row sum new'], data.loc[i][score_title], str(i), color='red', ha='right')
+    fig.tight_layout()
+    fig.savefig(f'plots/{256}shot{method_name3}_and_rowcolsum_indices.png',dpi=300)
+
+    # fig,axs = plt.subplots(2,1,figsize=(6,10))
+
+    # ax = axs[0]
     # sns.scatterplot(data=data, x='1-R2 column sum new', y=kshot_title,ax=ax)
+    # ax.errorbar(data['1-R2 column sum new'],data[kshot_title],yerr=data[kshot_title_stderr],fmt='o')
 
     # # Annotate each point with its DataFrame index
     # for i in data.index:
     #     ax.text(data.loc[i]['1-R2 column sum new'], data.loc[i][kshot_title], str(i), color='red', ha='right')
 
-    # fig.savefig(f'plots/kshot{method_name3}_and_colsum_indices.png',dpi=300)
+    # ax = axs[1]
+    # sns.scatterplot(data=data, x='1-R2 row sum new', y=kshot_title,ax=ax)
+    # ax.errorbar(data['1-R2 row sum new'],data[kshot_title],yerr=data[kshot_title_stderr],fmt='o')
+
+    # # Annotate each point with its DataFrame index
+    # for i in data.index:
+    #     ax.text(data.loc[i]['1-R2 row sum new'], data.loc[i][kshot_title], str(i), color='red', ha='right')
+    # fig.tight_layout()
+    # fig.savefig(f'plots/{128}shot{method_name3}_and_rowcolsum_indices.png',dpi=300)
 
     
     # plot_cross_decoding_scores_from_dataframe(
@@ -310,6 +331,8 @@ for dataset_name in Dscores.dataset.unique()[:1]:
     # )
     # square_score_dataframe = square_score_dataframe.loc[select_intersect_idx,select_intersect_idx]
     # square_score_dataframe.to_csv('plots/LFADS_mc_maze_20_cross_decoding_matrix.csv')
+    # square_score_dataframe_loaded = pd.read_csv('plots/LFADS_mc_maze_20_cross_decoding_matrix.csv',index_col=0)
+    # print('max col mean',(1 - square_score_dataframe_loaded.values).mean(axis=0).max())
     # print('best id', best_k_shot_idx[0])
     # print('worst id', worst_k_shot_idx[0])
     # fig,ax = plt.subplots()
@@ -392,7 +415,7 @@ for dataset_name in Dscores.dataset.unique()[:1]:
 
     ################### Pair grid
 
-    # grid = sns.PairGrid(data=select_Dscores, hue='method')
+    # grid = sns.PairGrid(data=select_Dscores[to_plot], hue='method')
     # # grid = sns.pairplot(data = select_Dscores, hue='fewshot_method', vars=['value','co-bps', 'vel R2', 'psth R2', 'fp-bps'],diag_kind=None)
     # grid.map_upper(sns.scatterplot, s=10)
     # grid.map_lower(sns.scatterplot, s=10)
@@ -443,16 +466,6 @@ for dataset_name in Dscores.dataset.unique()[:1]:
     # # fig.savefig(f'plots/NLBmetrics_{dataset_name}_best_only.png',dpi=200)
     # fig.savefig(f'plots/NLBmetrics_{dataset_name}_rates-as-latents_verybest_only_newcolsum_only.png',dpi=200)
     
-
-#######################
-
-
-
-
-# melted_D = transform_dataframe(D[fewshot_vars])
-# print(melted_D.head(4))
-
-# print(melted_D)
 
 
 #############################

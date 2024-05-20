@@ -109,6 +109,7 @@ def run_nlb_evaluation_protocol(
     variant='mc_maze_small',
     do_fewshot: bool = False,
     do_evaluation: bool = True,
+    use_rates_as_latents: bool = False, 
     ):
     """
     Evaluation protocol:
@@ -154,6 +155,9 @@ def run_nlb_evaluation_protocol(
     eval_rates_heldin, eval_rates_heldout = np.split(eval_rates, [spikes.shape[-1]], axis=-1)
     train_rates_heldin, train_rates_heldout = np.split(train_rates, [spikes.shape[-1]], axis=-1)
 
+    if use_rates_as_latents:
+        eval_latents = eval_rates
+
     latents_dict = {
         variant: {
             'eval_latents': eval_latents,
@@ -178,7 +182,7 @@ def run_nlb_evaluation_protocol(
     fewshot_latents_dict = {}
     if do_fewshot:
         # k_range = few_shot_metadata["Kvalues_applicable"] #2**np.arange(4,11)[:1].astype(int)
-        k_range = [few_shot_metadata["Kvalues_applicable"][i] for i in [4,-1]]#[3,4,-1]] #2**np.arange(4,11)[:1].astype(int)
+        k_range = [few_shot_metadata["Kvalues_applicable"][i] for i in [5,6,-1]]#[3,4,-1]] #2**np.arange(4,11)[:1].astype(int)
 
         # k_range = [int(k) for k in k_range]
         for k in k_range[:]:
@@ -189,10 +193,13 @@ def run_nlb_evaluation_protocol(
                 
                 fewshot_train_pred, fewshot_train_latents = run_model_on_numpy(model,fewshot_train_spikes_heldin)
                 fewshot_train_latents = fewshot_train_latents[:,:fewshot_train_spikes_heldin.shape[1]]
+                fewshot_train_pred = fewshot_train_pred[:,:fewshot_train_spikes_heldin.shape[1]]
                 # fewshot_train_latents_s = fewshot_train_latents.reshape(-1,fewshot_train_latents.shape[-1])
                 # fewshot_train_rates_s, eval_rates_s = fit_poisson_pl(fewshot_train_latents_s,eval_latents_s,fewshot_train_spikes_heldout_s)
                 # eval_rates = eval_rates_s.reshape(*heldout_spikes.shape[:2],-1)
                 # fewshot_output_dict [f'{k}shot_id{shot_id}_eval_rates_heldout'] = eval_rates
+                if use_rates_as_latents:
+                    fewshot_train_latents = fewshot_train_pred
                 fewshot_latents_dict[f'{k}shot_id{shot_id}_train_latents'] = fewshot_train_latents
 
     output_dict[variant] = {
