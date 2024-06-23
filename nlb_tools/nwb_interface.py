@@ -6,10 +6,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import scipy
+import scipy.signal as signal
 if scipy.__version__ < '1.12.0':
-    import scipy.signal as signal
+    from scipy.signal import gaussian
 else:
-    import scipy.signal.windows as signal
+    from scipy.signal.windows import gaussian
 import scipy.interpolate as interpolate
 import multiprocessing
 import itertools
@@ -689,7 +690,7 @@ class NWBDataset:
         # the window extends 3 x std in either direction
         win_len = int(6 * gauss_bin_std)
         # Create Gaussian kernel
-        window = signal.gaussian(win_len, gauss_bin_std, sym=True)
+        window = gaussian(win_len, gauss_bin_std, sym=True)
         window /= np.sum(window)
         # Extract spiking data
         spike_vals = self.data[signal_type].to_numpy()
