@@ -5,7 +5,11 @@ from glob import glob
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import scipy.signal as signal
+import scipy
+if scipy.__version__ < '1.12.0':
+    import scipy.signal as signal
+else:
+    import scipy.signal.windows as signal
 import scipy.interpolate as interpolate
 import multiprocessing
 import itertools
